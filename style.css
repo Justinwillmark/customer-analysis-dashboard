@@ -3,6 +3,14 @@ body {
     font-family: 'Inter', sans-serif;
     background-color: #f8fafc; /* slate-50 */
 }
+/* Cool/Fluid Typography */
+.main-title {
+    font-size: clamp(2rem, 5vw, 2.5rem);
+}
+.metric-value {
+    font-size: clamp(1.875rem, 5vw, 2.25rem);
+}
+
 .metric-card {
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
     position: relative; /* Needed for pop-up positioning */
@@ -140,56 +148,39 @@ input:checked + .slider:before {
     height: 1px;
 }
 
-/* Viewport Scroll Indicator Overlay */
-#scroll-indicator-overlay {
-    position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    background-color: rgba(15, 23, 42, 0.6); /* slate-900 with opacity */
-    backdrop-filter: blur(4px);
-    z-index: 9999;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    opacity: 0;
-    transition: opacity 0.3s ease-in-out;
-    pointer-events: none;
-}
-#scroll-indicator-overlay.is-visible {
-    opacity: 1;
-    pointer-events: auto; /* Allow clicking the overlay to dismiss */
-}
-
-/* Animated Scroll Arrow Indicator */
-#scroll-indicator-arrow {
-    width: 80px;
-    height: 80px;
-    background-color: rgba(255, 255, 255, 0.95);
-    color: #2563eb; /* blue-600 */
+/* Intuitive Scroll Hint */
+#scroll-hint-arrow {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 60px;
+    height: 60px;
+    background-color: rgba(37, 99, 235, 0.85); /* blue-600 with opacity */
+    color: white;
     border-radius: 50%;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 4rem;
-    line-height: 1;
+    font-size: 2.5rem; /* 40px */
     font-weight: 300;
-    box-shadow: 0 8px 25px rgba(0,0,0,0.3);
+    line-height: 1;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
+    z-index: 10;
+    pointer-events: none; /* Don't intercept mouse events */
+    opacity: 0;
+    visibility: hidden;
+    transition: opacity 0.3s ease-in-out, visibility 0.3s, transform 0.4s ease-in-out;
 }
-#scroll-indicator-arrow::before {
+#scroll-hint-arrow::before {
     content: '→';
 }
-#scroll-indicator-overlay.is-visible #scroll-indicator-arrow {
-    animation: pulse-horizontal 1.5s ease-in-out infinite;
+#scroll-hint-arrow.is-visible {
+    opacity: 1;
+    visibility: visible;
 }
-@keyframes pulse-horizontal {
-    0%, 100% {
-        transform: translateX(0);
-    }
-    50% {
-        transform: translateX(20px);
-    }
+#scroll-hint-arrow.flip {
+    transform: translate(-50%, -50%) rotate(180deg);
 }
 
 
@@ -284,7 +275,7 @@ input:checked + .slider:before {
     flex-shrink: 0;
 }
 
-.popup-copy-button {
+.popup-copy-button, .popup-action-btn {
     background-color: #2563eb; /* blue-600 */
     color: white;
     font-weight: 500;
@@ -295,28 +286,11 @@ input:checked + .slider:before {
     cursor: pointer;
     transition: background-color 0.2s;
 }
-.popup-copy-button:hover {
+.popup-copy-button:hover, .popup-action-btn:hover {
     background-color: #1d4ed8; /* blue-700 */
 }
 .popup-copy-button.copied {
     background-color: #16a34a; /* green-600 */
-}
-
-/* Generic action button for popups */
-.popup-action-btn {
-    background-color: #fff;
-    color: #334155; /* slate-700 */
-    font-weight: 500;
-    font-size: 0.75rem;
-    padding: 0.25rem 0.75rem;
-    border: 1px solid #cbd5e1; /* slate-300 */
-    border-radius: 0.375rem;
-    cursor: pointer;
-    transition: all 0.2s;
-}
-.popup-action-btn:hover {
-    background-color: #f1f5f9; /* slate-100 */
-    border-color: #94a3b8; /* slate-400 */
 }
 
 .account-exec-select {
@@ -329,11 +303,10 @@ input:checked + .slider:before {
     background-color: #fff;
 }
 
+.hidden {
+    display: none;
+}
 
 body {
   zoom: 80%;
-}
-
-.hidden {
-    display: none;
 }

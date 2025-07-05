@@ -2,13 +2,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- STATE MANAGEMENT & CONSTANTS ---
     let dataPeriod1 = [];
     let dataPeriod2 = [];
+    let churnDataPeriod = []; // <-- Holds data from the new churn-specific endpoint
     let filteredData = [];
     let dateRange1 = null;
     let dateRange2 = null;
     let charts = {};
     let hasShownScrollIndicator = false;
-    let indicatorTimeout;
-    const accountExecutives = ['Chimezie Ezimoha', 'Waheed Ayinla', 'Abraham Ohworieha', 'Semilogo(for call follow-ups)'];
+    const accountExecutives = ['Chimezie Ezimoha', 'Waheed Ayinla', 'Abraham Ohworieha', 'Semilogo (for phone call)'];
 
     // --- DOM ELEMENTS (File Upload) ---
     const uploadContainer1 = document.getElementById('upload-container-1');
@@ -55,9 +55,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const dataTable = document.getElementById('data-table');
     const tableTitle = document.getElementById('table-title');
     const tableScrollContainer = document.getElementById('table-scroll-container');
-    const scrollIndicatorOverlay = document.getElementById('scroll-indicator-overlay');
     const minTransInput = document.getElementById('min-trans');
     const maxTransInput = document.getElementById('max-trans');
+    const searchInput = document.getElementById('search-input');
     const exportBtn = document.getElementById('export-csv');
     const noResultsEl = document.getElementById('no-results');
     const tableDescription = document.getElementById('table-description');
@@ -84,7 +84,12 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     const formatDate = (dateString) => {
-        const date = new Date(dateString + 'T00:00:00'); // Treat as local time
+        if (!dateString) return 'N/A';
+        const date = new Date(dateString); 
+        // Check if the date is valid before formatting
+        if (isNaN(date.getTime())) {
+            return dateString; // Return original string if it's not a valid date
+        }
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
     
@@ -120,6 +125,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         dataPeriod1 = [];
         dataPeriod2 = [];
+        churnDataPeriod = [];
         filteredData = [];
         dateRange1 = null;
         dateRange2 = null;
@@ -203,7 +209,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 skipEmptyLines: true,
                 complete: (results) => {
                     const requiredColumns = ['First Name', 'Last Name', 'Phone Number', 'Transaction Count', 'Total Amount'];
-                    const missingColumns = requiredColumns.filter(col => !results.meta.fields.includes(col));
+                    let missingColumns = [];
+
+                    // The churn data has different columns, so we skip the check for it
+                    if (period !== 'churn') {
+                        missingColumns = requiredColumns.filter(col => !results.meta.fields.includes(col));
+                    }
+                     
                     if (missingColumns.length > 0) {
                         return reject(new Error(`Missing required columns in data: ${missingColumns.join(', ')}`));
                     }
@@ -215,7 +227,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     }));
 
                     if (period === 1) dataPeriod1 = parsedData;
-                    else dataPeriod2 = parsedData;
+                    else if (period === 2) dataPeriod2 = parsedData;
+                    else if (period === 'churn') churnDataPeriod = parsedData;
+
                     resolve();
                 },
                 error: (error) => reject(new Error(`CSV Parsing Error: ${error.message}`))
@@ -235,6 +249,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
+                // For file uploads, churn is calculated locally since there's no third file
                 await parseAndProcessData(e.target.result, period);
                 if (period === 1) {
                     dateRange1 = dateRange;
@@ -288,16 +303,26 @@ document.addEventListener('DOMContentLoaded', () => {
         dateRange1 = { start: start1, end: end1 };
         dateRange2 = { start: start2, end: end2 };
         
-        const retentionEndpoint = apiUrlInput.value.replace('/churn', '/retention');
+        const retentionEndpoint = baseUrl.replace('/churn', '/retention');
         const url1 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start1}&endDate=${end1}`;
         const url2 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start2}&endDate=${end2}`;
+        // New endpoint for churned users, using Period 1 dates
+        const churnUrl = `${retentionEndpoint}?download=churned-users&startDate=${start1}&endDate=${end1}`;
         
         try {
-            const [response1, response2] = await Promise.all([fetch(url1), fetch(url2)]);
+            const [response1, response2, churnResponse] = await Promise.all([fetch(url1), fetch(url2), fetch(churnUrl)]);
+
             if (!response1.ok) throw new Error(`API error for Period 1: ${response1.status} ${response1.statusText}`);
             if (!response2.ok) throw new Error(`API error for Period 2: ${response2.status} ${response2.statusText}`);
-            const [csvText1, csvText2] = await Promise.all([response1.text(), response2.text()]);
-            await Promise.all([parseAndProcessData(csvText1, 1), parseAndProcessData(csvText2, 2)]);
+            if (!churnResponse.ok) throw new Error(`API error for Churn Data: ${churnResponse.status} ${churnResponse.statusText}`);
+
+            const [csvText1, csvText2, churnCsvText] = await Promise.all([response1.text(), response2.text(), churnResponse.text()]);
+            
+            await Promise.all([
+                parseAndProcessData(csvText1, 1), 
+                parseAndProcessData(csvText2, 2),
+                parseAndProcessData(churnCsvText, 'churn') // Parse the new churn data
+            ]);
             analyzeData();
         } catch (error) {
             console.error(error);
@@ -318,18 +343,32 @@ document.addEventListener('DOMContentLoaded', () => {
         showStatus('Analyzing data...');
         hasShownScrollIndicator = false; // Reset the indicator flag for the new data
         
-        const usersP1 = new Set(dataPeriod1.map(u => u['Phone Number']));
-        const usersP2 = new Set(dataPeriod2.map(u => u['Phone Number']));
-        const retainedUsersSet = new Set([...usersP1].filter(phone => usersP2.has(phone)));
-        const newUsersSet = new Set([...usersP2].filter(phone => !usersP1.has(phone)));
-        const churnedUsersSet = new Set([...usersP1].filter(phone => !usersP2.has(phone)));
-        const retentionRate = usersP1.size > 0 ? (retainedUsersSet.size / usersP1.size * 100).toFixed(1) : 0;
+        const usersP1PhoneNumbers = new Set(dataPeriod1.map(u => u['Phone Number']));
+        const usersP2PhoneNumbers = new Set(dataPeriod2.map(u => u['Phone Number']));
+        
+        const retainedUsersSet = new Set([...usersP1PhoneNumbers].filter(phone => usersP2PhoneNumbers.has(phone)));
+        const newUsersSet = new Set([...usersP2PhoneNumbers].filter(phone => !usersP1PhoneNumbers.has(phone)));
+        
+        let relevantChurnData;
+        // If churnDataPeriod has been populated by the API, filter it.
+        // Otherwise (for file upload), calculate it locally.
+        if (churnDataPeriod.length > 0) {
+             relevantChurnData = churnDataPeriod.filter(churnedUser => 
+                usersP1PhoneNumbers.has(churnedUser['Phone Number'])
+            );
+        } else {
+            const churnedPhoneNumbers = new Set([...usersP1PhoneNumbers].filter(phone => !usersP2PhoneNumbers.has(phone)));
+            relevantChurnData = dataPeriod1.filter(user => churnedPhoneNumbers.has(user['Phone Number']));
+        }
+        
+        const churnedUsersCount = relevantChurnData.length;
+        const retentionRate = usersP1PhoneNumbers.size > 0 ? (retainedUsersSet.size / usersP1PhoneNumbers.size * 100).toFixed(1) : 0;
         
         document.getElementById('retention-rate').textContent = `${retentionRate}%`;
         document.getElementById('retained-users').textContent = retainedUsersSet.size;
         document.getElementById('new-users').textContent = newUsersSet.size;
-        document.getElementById('churned-users').textContent = churnedUsersSet.size;
-        document.getElementById('total-users').textContent = usersP2.size;
+        document.getElementById('churned-users').textContent = churnedUsersCount;
+        document.getElementById('total-users').textContent = usersP2PhoneNumbers.size;
 
         const period1Text = formatPeriodText(dateRange1);
         const period2Text = formatPeriodText(dateRange2);
@@ -341,30 +380,30 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const retainedData = dataPeriod2.filter(u => retainedUsersSet.has(u['Phone Number']));
         const newData = dataPeriod2.filter(u => newUsersSet.has(u['Phone Number']));
-        const churnedData = dataPeriod1.filter(u => churnedUsersSet.has(u['Phone Number']));
 
         createPopupTable('retained-popup', 'Retained Users', retainedData);
         createPopupTable('new-popup', 'New Users', newData);
-        createPopupTable('churned-popup', 'Churned Users', churnedData);
+        createPopupTable('churned-popup', 'Churned Users', relevantChurnData);
         createPopupTable('total-popup', 'Total Active Users', dataPeriod2);
 
         tableTitle.textContent = `User Data for ${period2Text}`;
         tableDescription.textContent = `Showing ${dataPeriod2.length} total users in this period.`;
 
-        renderCharts({ p1: { count: usersP1.size }, p2: { count: usersP2.size }, retained: retainedUsersSet.size });
+        renderCharts({ p1: { count: usersP1PhoneNumbers.size }, p2: { count: usersP2PhoneNumbers.size }, retained: retainedUsersSet.size });
         
-        const totalTransactionsP1 = dataPeriod1.reduce((sum, u) => sum + u['Transaction Count'], 0);
-        const totalTransactionsP2 = dataPeriod2.reduce((sum, u) => sum + u['Transaction Count'], 0);
-        const totalAmountP1 = dataPeriod1.reduce((sum, u) => sum + u['Total Amount'], 0);
-        const totalAmountP2 = dataPeriod2.reduce((sum, u) => sum + u['Total Amount'], 0);
+        const totalTransactionsP1 = dataPeriod1.reduce((sum, u) => sum + (u['Transaction Count'] || 0), 0);
+        const totalTransactionsP2 = dataPeriod2.reduce((sum, u) => sum + (u['Transaction Count'] || 0), 0);
+        const totalAmountP1 = dataPeriod1.reduce((sum, u) => sum + (u['Total Amount'] || 0), 0);
+        const totalAmountP2 = dataPeriod2.reduce((sum, u) => sum + (u['Total Amount'] || 0), 0);
         
         renderTransactionChart({ p1: { count: totalTransactionsP1, amount: totalAmountP1 }, p2: { count: totalTransactionsP2, amount: totalAmountP2 } });
 
-        filteredData = [...dataPeriod2];
-        renderTable(filteredData);
+        applyFilters();
 
         hideStatus();
         dashboard.classList.remove('hidden');
+
+        dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
     // --- RENDERING FUNCTIONS ---
@@ -381,7 +420,7 @@ document.addEventListener('DOMContentLoaded', () => {
             <div class="popup-table-container">
                 <table class="popup-table">
                     <thead><tr><th>Name</th><th>Transactions</th><th>Phone</th></tr></thead>
-                    <tbody>${data.slice(0, 10).map(row => `<tr><td>${row['First Name']} ${row['Last Name']}</td><td style="text-align: center;">${row['Transaction Count']}</td><td>${row['Phone Number']}</td></tr>`).join('')}</tbody>
+                    <tbody>${data.slice(0, 10).map(row => `<tr><td>${row['First Name']} ${row['Last Name']}</td><td style="text-align: center;">${row['Transaction Count'] || 'N/A'}</td><td>${row['Phone Number']}</td></tr>`).join('')}</tbody>
                 </table>
             </div>`;
         
@@ -398,8 +437,11 @@ document.addEventListener('DOMContentLoaded', () => {
             e.stopPropagation();
             let headers, tsv;
             if (popupId === 'churned-popup') {
-                headers = "First Name\tLast Name\tTransaction Count\tPhone Number\tStore Address\n";
-                tsv = data.map(row => `${row['First Name']}\t${row['Last Name']}\t${row['Transaction Count']}\t${row['Phone Number']}\t${row['Store Address'] || ''}`).join('\n');
+                headers = "First Name\tLast Name\tPhone Number\tStore Name\tStore Address\tLast Sale Date\n";
+                tsv = data.map(row => {
+                    const formattedDate = formatDate(row['Created Date']);
+                    return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Store Name'] || ''}\t${row['Store Address'] || ''}\t${formattedDate === 'N/A' ? '' : formattedDate}`
+                }).join('\n');
             } else {
                 headers = "First Name\tLast Name\tTransaction Count\tPhone Number\n";
                 tsv = data.map(row => `${row['First Name']}\t${row['Last Name']}\t${row['Transaction Count']}\t${row['Phone Number']}`).join('\n');
@@ -418,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (popupId === 'churned-popup') {
             const viewAllBtn = document.createElement('button');
-            viewAllBtn.textContent = 'View All';
+            viewAllBtn.textContent = 'Expand';
             viewAllBtn.className = 'popup-action-btn';
             viewAllBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -449,6 +491,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <th>Phone</th>
                             <th>Store Name</th>
                             <th>Store Address</th>
+                            <th style="min-width: 100px;">Last Sale Date</th>
                             <th>Account Executive</th>
                         </tr>
                     </thead>
@@ -459,6 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
                             <td>${row['Phone Number']}</td>
                             <td>${row['Store Name'] || 'N/A'}</td>
                             <td>${row['Store Address'] || 'N/A'}</td>
+                            <td>${formatDate(row['Created Date'])}</td>
                             <td>
                                 <select class="account-exec-select" data-phone="${row['Phone Number']}">
                                     ${executiveOptions}
@@ -496,10 +540,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 assignments[select.dataset.phone] = select.value;
             });
             
-            const headers = "First Name\tLast Name\tPhone Number\tStore Name\tStore Address\tAccount Executive\n";
+            const headers = "First Name\tLast Name\tPhone Number\tStore Name\tStore Address\tLast Sale Date\tAccount Executive\n";
             const tsv = data.map(row => {
                 const executive = assignments[row['Phone Number']] || '';
-                return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Store Name'] || ''}\t${row['Store Address'] || ''}\t${executive}`;
+                const formattedDate = formatDate(row['Created Date']);
+                return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Store Name'] || ''}\t${row['Store Address'] || ''}\t${formattedDate === 'N/A' ? '' : formattedDate}\t${executive}`;
             }).join('\n');
 
             navigator.clipboard.writeText(headers + tsv).then(() => {
@@ -578,11 +623,35 @@ document.addEventListener('DOMContentLoaded', () => {
     const applyFilters = () => {
         const min = parseInt(minTransInput.value, 10);
         const max = parseInt(maxTransInput.value, 10);
-        filteredData = dataPeriod2.filter(row => { const count = row['Transaction Count']; const minMatch = isNaN(min) || count >= min; const maxMatch = isNaN(max) || count <= max; return minMatch && maxMatch; });
+        const searchTerm = searchInput.value.toLowerCase().trim();
+
+        filteredData = dataPeriod2.filter(row => {
+            const count = row['Transaction Count'];
+            const minMatch = isNaN(min) || count >= min;
+            const maxMatch = isNaN(max) || count <= max;
+
+            if (!minMatch || !maxMatch) return false;
+
+            if (searchTerm) {
+                const fullName = `${row['First Name'] || ''} ${row['Last Name'] || ''}`.toLowerCase();
+                const phone = (row['Phone Number'] || '').toLowerCase();
+                const lga = (row['LGA'] || '').toLowerCase();
+                const store = (row['Store Name'] || '').toLowerCase();
+
+                return fullName.includes(searchTerm) ||
+                       phone.includes(searchTerm) ||
+                       lga.includes(searchTerm) ||
+                       store.includes(searchTerm);
+            }
+            
+            return true;
+        });
         renderTable(filteredData);
     };
     minTransInput.addEventListener('input', applyFilters);
     maxTransInput.addEventListener('input', applyFilters);
+    searchInput.addEventListener('input', applyFilters);
+
 
     exportBtn.addEventListener('click', () => {
         if (filteredData.length === 0) { alert('No data to export.'); return; }
@@ -636,40 +705,51 @@ document.addEventListener('DOMContentLoaded', () => {
         presets.forEach(p => apiPresetsChurn.appendChild(createButton(p, 'churn')));
     };
 
-    // Listener for the new viewport-centralized scroll indicator
-    tableScrollContainer.addEventListener('mouseenter', () => {
-        // Stop if the hint has been shown for this data load
-        if (hasShownScrollIndicator) return;
+    // --- Intuitive Scroll Hint Animation ---
+    const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
-        // Check if the table is actually scrollable
+    const triggerScrollHintAnimation = async () => {
+        const arrow = document.getElementById('scroll-hint-arrow');
+        const container = tableScrollContainer;
+        const scrollableWidth = container.scrollWidth - container.clientWidth;
+
+        if (scrollableWidth <= 0) return;
+
+        const scrollDuration = 500; // Time for one scroll movement in ms
+        const pauseDuration = 100;  // A short pause between movements
+
+        arrow.classList.add('is-visible');
+        await sleep(50); // let it fade in
+
+        // --- Cycle 1 ---
+        arrow.classList.remove('flip'); // Point right
+        container.scrollTo({ left: scrollableWidth, behavior: 'smooth' });
+        await sleep(scrollDuration + pauseDuration);
+
+        arrow.classList.add('flip'); // Point left
+        container.scrollTo({ left: 0, behavior: 'smooth' });
+        await sleep(scrollDuration + pauseDuration);
+
+        // --- Cycle 2 ---
+        arrow.classList.remove('flip'); // Point right
+        container.scrollTo({ left: scrollableWidth, behavior: 'smooth' });
+        await sleep(scrollDuration + pauseDuration);
+
+        arrow.classList.add('flip'); // Point left
+        container.scrollTo({ left: 0, behavior: 'smooth' });
+        await sleep(scrollDuration + pauseDuration);
+
+        // Hide arrow
+        arrow.classList.remove('is-visible');
+    };
+
+    tableScrollContainer.addEventListener('mouseenter', () => {
+        if (hasShownScrollIndicator) return;
+        
         const isScrollable = tableScrollContainer.scrollWidth > tableScrollContainer.clientWidth;
         if (isScrollable) {
-            hasShownScrollIndicator = true; // Set flag to true
-            
-            // Show the overlay
-            scrollIndicatorOverlay.classList.remove('hidden');
-            // A tiny delay ensures the CSS transition is applied correctly after display changes
-            setTimeout(() => {
-                scrollIndicatorOverlay.classList.add('is-visible');
-            }, 10);
-
-            // Set a timer to automatically hide the overlay after 2 seconds
-            indicatorTimeout = setTimeout(() => {
-                scrollIndicatorOverlay.classList.remove('is-visible');
-            }, 2000);
-        }
-    });
-
-    // Also allow the user to click the overlay to dismiss it early
-    scrollIndicatorOverlay.addEventListener('click', () => {
-        clearTimeout(indicatorTimeout); // Stop the automatic timer
-        scrollIndicatorOverlay.classList.remove('is-visible');
-    });
-
-    // Hide the overlay from the DOM after its fade-out transition finishes
-    scrollIndicatorOverlay.addEventListener('transitionend', () => {
-        if (!scrollIndicatorOverlay.classList.contains('is-visible')) {
-            scrollIndicatorOverlay.classList.add('hidden');
+            hasShownScrollIndicator = true;
+            triggerScrollHintAnimation();
         }
     });
 
