@@ -18,7 +18,7 @@
 
         <header class="mb-8 text-center">
             <h1 class="text-4xl font-bold text-slate-900">Customer Retention & Analysis Dashboard</h1>
-            <p class="text-slate-500 mt-2 max-w-2xl mx-auto">Upload two transaction summaries to compare periods and analyze retention.</p>
+            <p class="text-slate-500 mt-2 max-w-2xl mx-auto">Upload two transaction summaries to compare periods or use the API fetch for cohort and churn analysis.</p>
         </header>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
@@ -46,7 +46,7 @@
             </div>
         </div>
 
-        <details class="api-details bg-slate-50 rounded-xl border border-slate-200 mb-8">
+        <details class="api-details bg-slate-50 rounded-xl border border-slate-200 mb-8" open>
             <summary class="api-summary">Alternative: Fetch from API Endpoint</summary>
             <div class="p-6">
                 <div class="grid grid-cols-1 gap-6">
@@ -54,28 +54,53 @@
                         <label for="api-url" class="block text-sm font-medium text-slate-700">Base API URL</label>
                         <input type="text" id="api-url" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" value="https://pika-inventory-94729b833f18.herokuapp.com/api/v1/admin/analytics/retention">
                     </div>
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
-                        <div>
-                            <h4 class="text-sm font-medium text-slate-700 mb-2">Period 1 Date Range</h4>
-                            <div class="flex items-center gap-2 mb-3" id="api-presets-1">
+
+                    <div class="flex items-center justify-end gap-3">
+                         <label for="cohort-toggle" class="text-sm font-medium text-slate-700">Use Cohort Comparison</label>
+                         <label class="toggle-switch">
+                            <input type="checkbox" id="cohort-toggle" checked>
+                            <span class="slider"></span>
+                        </label>
+                    </div>
+
+                    <div id="cohort-inputs">
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
+                            <div>
+                                <h4 class="text-sm font-medium text-slate-700 mb-2">Period 1 Date Range</h4>
+                                <div class="flex items-center gap-2 mb-3" id="api-presets-1"></div>
+                                <div class="flex items-center gap-2">
+                                    <input type="date" id="api-start-1" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+                                    <span class="text-slate-400">to</span>
+                                    <input type="date" id="api-end-1" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
                                 </div>
-                            <div class="flex items-center gap-2">
-                                <input type="date" id="api-start-1" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
-                                <span class="text-slate-400">to</span>
-                                <input type="date" id="api-end-1" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+                                <div id="date-display-1" class="mt-3"></div>
                             </div>
-                        </div>
-                        <div>
-                            <h4 class="text-sm font-medium text-slate-700 mb-2">Period 2 Date Range</h4>
-                             <div class="flex items-center gap-2 mb-3" id="api-presets-2">
+                            <div>
+                                <h4 class="text-sm font-medium text-slate-700 mb-2">Period 2 Date Range</h4>
+                                <div class="flex items-center gap-2 mb-3" id="api-presets-2"></div>
+                                <div class="flex items-center gap-2">
+                                    <input type="date" id="api-start-2" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+                                    <span class="text-slate-400">to</span>
+                                    <input type="date" id="api-end-2" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
                                 </div>
-                            <div class="flex items-center gap-2">
-                                <input type="date" id="api-start-2" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
-                                <span class="text-slate-400">to</span>
-                                <input type="date" id="api-end-2" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+                                <div id="date-display-2" class="mt-3"></div>
                             </div>
                         </div>
                     </div>
+
+                    <div id="churn-inputs" class="hidden">
+                        <div>
+                             <h4 class="text-sm font-medium text-slate-700 mb-2">Observation Date Range (Churn is calculated based on inactivity in the 30 days prior)</h4>
+                             <div class="flex items-center gap-2 mb-3" id="api-presets-churn"></div>
+                             <div class="flex items-center gap-2">
+                                <input type="date" id="api-start-churn" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+                                <span class="text-slate-400">to</span>
+                                <input type="date" id="api-end-churn" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+                             </div>
+                             <div id="date-display-churn" class="mt-3"></div>
+                        </div>
+                    </div>
+
                 </div>
                 <div class="mt-6 text-right">
                     <button id="fetch-api-data" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 transition">Fetch & Analyze Data</button>
@@ -95,7 +120,7 @@
                 <div class="metric-card bg-white p-5 rounded-xl shadow-sm"><h3 class="text-sm font-medium text-slate-500">Retention Rate</h3><p id="retention-rate" class="text-3xl font-bold mt-1"></p></div>
                 <div class="metric-card bg-white p-5 rounded-xl shadow-sm has-popup"><h3 class="text-sm font-medium text-slate-500">Retained Users</h3><p id="retained-users" class="text-3xl font-bold mt-1"></p><p id="retained-when" class="text-xs text-slate-400 mt-1"></p><div id="retained-popup" class="card-popup"></div></div>
                 <div class="metric-card bg-white p-5 rounded-xl shadow-sm has-popup"><h3 class="text-sm font-medium text-slate-500">New Users</h3><p id="new-users" class="text-3xl font-bold mt-1"></p><p id="new-when" class="text-xs text-slate-400 mt-1"></p><div id="new-popup" class="card-popup"></div></div>
-                <div class="metric-card bg-white p-5 rounded-xl shadow-sm has-popup"><h3 class="text-sm font-medium text-slate-500">Churned Users</h3><p id="churned-users" class="text-3xl font-bold mt-1"></p><p id="churned-when" class="text-xs text-slate-400 mt-1"></p><div id="churned-popup" class="card-popup"></div></div>
+                <div id="churned-users-card" class="metric-card bg-white p-5 rounded-xl shadow-sm has-popup"><h3 class="text-sm font-medium text-slate-500">Churned Users</h3><p id="churned-users" class="text-3xl font-bold mt-1"></p><p id="churned-when" class="text-xs text-slate-400 mt-1"></p><div id="churned-popup" class="card-popup"></div></div>
                 <div class="metric-card bg-white p-5 rounded-xl shadow-sm has-popup"><h3 class="text-sm font-medium text-slate-500">Total Active Users</h3><p id="total-users" class="text-3xl font-bold mt-1"></p><p id="total-when" class="text-xs text-slate-400 mt-1"></p><div id="total-popup" class="card-popup"></div></div>
             </div>
 
@@ -113,8 +138,8 @@
             <div class="bg-white p-6 rounded-xl shadow-sm">
                 <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
                     <div>
-                        <h3 class="text-xl font-semibold">User Data</h3>
-                        <p id="table-description" class="text-sm text-slate-500 mt-1">Showing all users from the latest period.</p>
+                        <h3 id="table-title" class="text-xl font-semibold">User Data</h3>
+                        <p id="table-description" class="text-sm text-slate-500 mt-1">Select a period to see user data.</p>
                     </div>
                     <div class="flex items-center gap-4 w-full sm:w-auto">
                         <div class="w-full sm:w-64">
@@ -128,7 +153,7 @@
                         <button id="export-csv" class="self-end bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 transition h-fit">Export CSV</button>
                     </div>
                 </div>
-                <div class="overflow-x-auto">
+                <div id="table-scroll-container" class="overflow-x-auto relative">
                     <table class="min-w-full divide-y divide-slate-200">
                         <thead class="bg-slate-50">
                             <tr>
@@ -137,6 +162,7 @@
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Phone Number</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">LGA</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Store Name</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Store Address</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Transaction Count</th>
                                 <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Total Amount</th>
                             </tr>
@@ -148,6 +174,10 @@
                 </div>
             </div>
         </div>
+    </div>
+
+    <div id="scroll-indicator-overlay" class="hidden">
+        <div id="scroll-indicator-arrow"></div>
     </div>
 
     <script src="script.js"></script>

@@ -1,11 +1,14 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- STATE MANAGEMENT ---
+    // --- STATE MANAGEMENT & CONSTANTS ---
     let dataPeriod1 = [];
     let dataPeriod2 = [];
     let filteredData = [];
     let dateRange1 = null;
     let dateRange2 = null;
     let charts = {};
+    let hasShownScrollIndicator = false;
+    let indicatorTimeout;
+    const accountExecutives = ['Chimezie Ezimoha', 'Waheed Ayinla', 'Abraham Ohworieha', 'Semilogo(for call follow-ups)'];
 
     // --- DOM ELEMENTS (File Upload) ---
     const uploadContainer1 = document.getElementById('upload-container-1');
@@ -20,13 +23,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- DOM ELEMENTS (API Fetch) ---
     const apiUrlInput = document.getElementById('api-url');
+    const fetchApiBtn = document.getElementById('fetch-api-data');
+    
+    // Cohort Elements
+    const cohortToggle = document.getElementById('cohort-toggle');
+    const cohortInputs = document.getElementById('cohort-inputs');
     const apiStart1Input = document.getElementById('api-start-1');
     const apiEnd1Input = document.getElementById('api-end-1');
     const apiStart2Input = document.getElementById('api-start-2');
     const apiEnd2Input = document.getElementById('api-end-2');
-    const fetchApiBtn = document.getElementById('fetch-api-data');
     const apiPresets1 = document.getElementById('api-presets-1');
     const apiPresets2 = document.getElementById('api-presets-2');
+
+    // Churn Elements
+    const churnInputs = document.getElementById('churn-inputs');
+    const apiStartChurnInput = document.getElementById('api-start-churn');
+    const apiEndChurnInput = document.getElementById('api-end-churn');
+    const apiPresetsChurn = document.getElementById('api-presets-churn');
+
+    // Visual Date Display Elements
+    const dateDisplay1 = document.getElementById('date-display-1');
+    const dateDisplay2 = document.getElementById('date-display-2');
+    const dateDisplayChurn = document.getElementById('date-display-churn');
+
 
     // --- GENERAL DOM ELEMENTS ---
     const dashboard = document.getElementById('dashboard');
@@ -34,6 +53,9 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusMessage = document.getElementById('status-message');
     const loader = document.getElementById('loader');
     const dataTable = document.getElementById('data-table');
+    const tableTitle = document.getElementById('table-title');
+    const tableScrollContainer = document.getElementById('table-scroll-container');
+    const scrollIndicatorOverlay = document.getElementById('scroll-indicator-overlay');
     const minTransInput = document.getElementById('min-trans');
     const maxTransInput = document.getElementById('max-trans');
     const exportBtn = document.getElementById('export-csv');
@@ -66,16 +88,124 @@ document.addEventListener('DOMContentLoaded', () => {
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
     
+    const formatPeriodText = (range) => {
+        if (!range || !range.start || range.start === 'File') return 'the selected file';
+        
+        const startDate = new Date(range.start + 'T00:00:00');
+        const endDate = new Date(range.end + 'T00:00:00');
+        const startYear = startDate.getFullYear();
+        const endYear = endDate.getFullYear();
+        
+        if (startYear !== endYear) {
+            return `${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+        } else {
+            return `${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+        }
+    };
+
+    const toYYYYMMDD = (d) => d.toISOString().split('T')[0];
+    
+    const truncateText = (text, wordLimit = 3) => {
+        if (!text) return 'N/A';
+        const words = text.split(' ');
+        if (words.length > wordLimit) {
+            return words.slice(0, wordLimit).join(' ') + ' ...';
+        }
+        return text;
+    };
+    
+    const resetDashboard = () => {
+        dashboard.classList.add('hidden');
+        hideStatus();
+
+        dataPeriod1 = [];
+        dataPeriod2 = [];
+        filteredData = [];
+        dateRange1 = null;
+        dateRange2 = null;
+
+        destroyCharts();
+
+        document.getElementById('retention-rate').textContent = '-';
+        document.getElementById('retained-users').textContent = '-';
+        document.getElementById('new-users').textContent = '-';
+        document.getElementById('churned-users').textContent = '-';
+        document.getElementById('total-users').textContent = '-';
+        ['retained-when', 'new-when', 'churned-when', 'total-when'].forEach(id => {
+            document.getElementById(id).textContent = '';
+        });
+
+
+        ['retained-popup', 'new-popup', 'churned-popup', 'total-popup'].forEach(id => {
+            const popup = document.getElementById(id);
+            if (popup) {
+                popup.innerHTML = '';
+                popup.classList.remove('expanded');
+            }
+        });
+
+        dataTable.innerHTML = '';
+        noResultsEl.classList.add('hidden');
+        tableTitle.textContent = 'User Data';
+        tableDescription.textContent = 'Select a period to see user data.';
+        
+        fileInput1.value = '';
+        fileInput2.value = '';
+        fileName1.textContent = 'Drag & drop or click to upload';
+        fileName2.textContent = 'Upload Period 1 file first';
+        dateRangeEl1.textContent = '';
+        dateRangeEl2.textContent = '';
+        if (!uploadContainer2.classList.contains('disabled')) {
+             uploadContainer2.classList.add('disabled');
+             uploadLabel2.classList.add('cursor-not-allowed');
+             fileInput2.disabled = true;
+        }
+
+        dateDisplay1.innerHTML = '';
+        dateDisplay2.innerHTML = '';
+        dateDisplayChurn.innerHTML = '';
+    };
+
+    const updateDateDisplay = (startInput, endInput, displayContainer) => {
+        const startVal = startInput.value;
+        const endVal = endInput.value;
+
+        if (startVal && endVal && new Date(startVal) <= new Date(endVal)) {
+            const startDate = new Date(startVal + 'T00:00:00');
+            const endDate = new Date(endVal + 'T00:00:00');
+            let startText, endText;
+            const startYear = startDate.getFullYear();
+            const endYear = endDate.getFullYear();
+
+            if (startYear !== endYear) {
+                startText = startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+                endText = endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            } else {
+                startText = startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+                endText = endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+            }
+
+            displayContainer.innerHTML = `
+                <div class="date-display-container">
+                    <span class="date-display-text">${startText}</span>
+                    <div class="date-display-line"></div>
+                    <span class="date-display-text">${endText}</span>
+                </div>`;
+        } else {
+            displayContainer.innerHTML = '';
+        }
+    };
+
     const parseAndProcessData = (csvText, period) => {
         return new Promise((resolve, reject) => {
             Papa.parse(csvText, {
                 header: true,
                 skipEmptyLines: true,
                 complete: (results) => {
-                    const requiredColumns = ['First Name', 'Last Name', 'Phone Number', 'LGA', 'Transaction Count', 'Total Amount'];
+                    const requiredColumns = ['First Name', 'Last Name', 'Phone Number', 'Transaction Count', 'Total Amount'];
                     const missingColumns = requiredColumns.filter(col => !results.meta.fields.includes(col));
                     if (missingColumns.length > 0) {
-                        return reject(new Error(`Missing required columns in data for period ${period}: ${missingColumns.join(', ')}`));
+                        return reject(new Error(`Missing required columns in data: ${missingColumns.join(', ')}`));
                     }
                     
                     const parsedData = results.data.map(row => ({
@@ -84,14 +214,11 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Total Amount': parseFloat(row['Total Amount']) || 0,
                     }));
 
-                    if (period === 1) {
-                        dataPeriod1 = parsedData;
-                    } else {
-                        dataPeriod2 = parsedData;
-                    }
+                    if (period === 1) dataPeriod1 = parsedData;
+                    else dataPeriod2 = parsedData;
                     resolve();
                 },
-                error: (error) => reject(new Error(`CSV Parsing Error for period ${period}: ${error.message}`))
+                error: (error) => reject(new Error(`CSV Parsing Error: ${error.message}`))
             });
         });
     };
@@ -103,7 +230,7 @@ document.addEventListener('DOMContentLoaded', () => {
         resetError();
         showStatus(`Processing ${file.name}...`);
         
-        const dateRange = { start: 'File', end: 'Data' }; // Placeholder for filename-based dates
+        const dateRange = { start: 'File', end: 'Data' };
         
         const reader = new FileReader();
         reader.onload = async (e) => {
@@ -129,44 +256,54 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const handleApiFetch = async () => {
-        const baseUrl = apiUrlInput.value.trim();
-        const start1 = apiStart1Input.value;
-        const end1 = apiEnd1Input.value;
-        const start2 = apiStart2Input.value;
-        const end2 = apiEnd2Input.value;
-
-        if (!baseUrl || !start1 || !end1 || !start2 || !end2) {
-            alert('Please fill in the Base API URL and select all dates.');
-            return;
-        }
+        let baseUrl = apiUrlInput.value.trim();
+        let start1, end1, start2, end2;
 
         resetError();
-        showStatus('Fetching data from API...');
+        
+        if (cohortToggle.checked) {
+            start1 = apiStart1Input.value; end1 = apiEnd1Input.value;
+            start2 = apiStart2Input.value; end2 = apiEnd2Input.value;
+            if (!baseUrl || !start1 || !end1 || !start2 || !end2) {
+                alert('Please fill in the Base API URL and select all dates for both periods.');
+                return;
+            }
+        } else {
+            const churnStart = apiStartChurnInput.value, churnEnd = apiEndChurnInput.value;
+            if (!baseUrl || !churnStart || !churnEnd) {
+                alert('Please fill in the Base API URL and select an observation date range.');
+                return;
+            }
+            start2 = churnStart; end2 = churnEnd;
+            const period2StartDate = new Date(churnStart + 'T00:00:00');
+            const period1EndDate = new Date(period2StartDate);
+            period1EndDate.setDate(period1EndDate.getDate() - 1);
+            const period1StartDate = new Date(period1EndDate);
+            period1StartDate.setDate(period1StartDate.getDate() - 29);
+            start1 = toYYYYMMDD(period1StartDate);
+            end1 = toYYYYMMDD(period1EndDate);
+        }
 
+        showStatus('Fetching data from API...');
         dateRange1 = { start: start1, end: end1 };
         dateRange2 = { start: start2, end: end2 };
         
-        const url1 = `${baseUrl}?download=retained-user-stats&startDate=${start1}&endDate=${end1}`;
-        const url2 = `${baseUrl}?download=retained-user-stats&startDate=${start2}&endDate=${end2}`;
-
+        const retentionEndpoint = apiUrlInput.value.replace('/churn', '/retention');
+        const url1 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start1}&endDate=${end1}`;
+        const url2 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start2}&endDate=${end2}`;
+        
         try {
             const [response1, response2] = await Promise.all([fetch(url1), fetch(url2)]);
-
             if (!response1.ok) throw new Error(`API error for Period 1: ${response1.status} ${response1.statusText}`);
             if (!response2.ok) throw new Error(`API error for Period 2: ${response2.status} ${response2.statusText}`);
-
             const [csvText1, csvText2] = await Promise.all([response1.text(), response2.text()]);
-
             await Promise.all([parseAndProcessData(csvText1, 1), parseAndProcessData(csvText2, 2)]);
-            
             analyzeData();
-
         } catch (error) {
             console.error(error);
-            showError(`Failed to fetch or process API data. Check console for details. Error: ${error.message}`);
+            showError(`Failed to fetch or process API data. Error: ${error.message}`);
         }
     };
-
 
     const enablePeriod2Upload = () => {
         uploadContainer2.classList.remove('disabled');
@@ -179,6 +316,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- CORE ANALYSIS LOGIC ---
     const analyzeData = () => {
         showStatus('Analyzing data...');
+        hasShownScrollIndicator = false; // Reset the indicator flag for the new data
         
         const usersP1 = new Set(dataPeriod1.map(u => u['Phone Number']));
         const usersP2 = new Set(dataPeriod2.map(u => u['Phone Number']));
@@ -193,23 +331,25 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('churned-users').textContent = churnedUsersSet.size;
         document.getElementById('total-users').textContent = usersP2.size;
 
-        const period1Text = dateRange1.start === 'File' ? 'in Period 1' : `from ${formatDate(dateRange1.start)} to ${formatDate(dateRange1.end)}`;
-        const period2Text = dateRange2.start === 'File' ? 'in Period 2' : `from ${formatDate(dateRange2.start)} to ${formatDate(dateRange2.end)}`;
-        document.getElementById('retained-when').textContent = period2Text;
-        document.getElementById('new-when').textContent = period2Text;
-        document.getElementById('churned-when').textContent = period1Text;
-        document.getElementById('total-when').textContent = period2Text;
+        const period1Text = formatPeriodText(dateRange1);
+        const period2Text = formatPeriodText(dateRange2);
+        
+        document.getElementById('retained-when').textContent = `from ${period2Text}`;
+        document.getElementById('new-when').textContent = `from ${period2Text}`;
+        document.getElementById('churned-when').textContent = `from ${period1Text}`;
+        document.getElementById('total-when').textContent = `from ${period2Text}`;
 
         const retainedData = dataPeriod2.filter(u => retainedUsersSet.has(u['Phone Number']));
         const newData = dataPeriod2.filter(u => newUsersSet.has(u['Phone Number']));
         const churnedData = dataPeriod1.filter(u => churnedUsersSet.has(u['Phone Number']));
 
-        createPopupTable('retained-popup', retainedData);
-        createPopupTable('new-popup', newData);
-        createPopupTable('churned-popup', churnedData);
-        createPopupTable('total-popup', dataPeriod2);
+        createPopupTable('retained-popup', 'Retained Users', retainedData);
+        createPopupTable('new-popup', 'New Users', newData);
+        createPopupTable('churned-popup', 'Churned Users', churnedData);
+        createPopupTable('total-popup', 'Total Active Users', dataPeriod2);
 
-        tableDescription.textContent = `Showing ${dataPeriod2.length} users ${period2Text}`;
+        tableTitle.textContent = `User Data for ${period2Text}`;
+        tableDescription.textContent = `Showing ${dataPeriod2.length} total users in this period.`;
 
         renderCharts({ p1: { count: usersP1.size }, p2: { count: usersP2.size }, retained: retainedUsersSet.size });
         
@@ -218,10 +358,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const totalAmountP1 = dataPeriod1.reduce((sum, u) => sum + u['Total Amount'], 0);
         const totalAmountP2 = dataPeriod2.reduce((sum, u) => sum + u['Total Amount'], 0);
         
-        renderTransactionChart({
-            p1: { count: totalTransactionsP1, amount: totalAmountP1 },
-            p2: { count: totalTransactionsP2, amount: totalAmountP2 }
-        });
+        renderTransactionChart({ p1: { count: totalTransactionsP1, amount: totalAmountP1 }, p2: { count: totalTransactionsP2, amount: totalAmountP2 } });
 
         filteredData = [...dataPeriod2];
         renderTable(filteredData);
@@ -231,38 +368,153 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     // --- RENDERING FUNCTIONS ---
-    const createPopupTable = (popupId, data) => {
+    const createPopupTable = (popupId, title, data) => {
         const container = document.getElementById(popupId);
         container.innerHTML = '';
+        container.classList.remove('expanded');
         if (!data || data.length === 0) {
             container.innerHTML = `<p class="text-xs text-slate-500 p-4 text-center">No users to show.</p>`;
             return;
         }
-        const table = document.createElement('table');
-        table.className = 'popup-table';
-        table.innerHTML = `
-            <thead><tr><th>Name</th><th>Transactions</th><th>Phone</th></tr></thead>
-            <tbody>${data.slice(0, 10).map(row => `<tr><td>${row['First Name']} ${row['Last Name']}</td><td style="text-align: center;">${row['Transaction Count']}</td><td>${row['Phone Number']}</td></tr>`).join('')}</tbody>
-        `;
-        container.appendChild(table);
+
+        const tableHTML = `
+            <div class="popup-table-container">
+                <table class="popup-table">
+                    <thead><tr><th>Name</th><th>Transactions</th><th>Phone</th></tr></thead>
+                    <tbody>${data.slice(0, 10).map(row => `<tr><td>${row['First Name']} ${row['Last Name']}</td><td style="text-align: center;">${row['Transaction Count']}</td><td>${row['Phone Number']}</td></tr>`).join('')}</tbody>
+                </table>
+            </div>`;
+        
         const footer = document.createElement('div');
         footer.className = 'popup-footer';
+        
         const remainingText = document.createElement('span');
         remainingText.textContent = data.length > 10 ? `...and ${data.length - 10} more.` : `Total: ${data.length} users.`;
+        
         const copyButton = document.createElement('button');
         copyButton.textContent = 'Copy All';
         copyButton.className = 'popup-copy-button';
-        copyButton.addEventListener('click', () => {
-            const headers = "First Name\tLast Name\tTransaction Count\tPhone Number\n";
-            const tsv = data.map(row => `${row['First Name']}\t${row['Last Name']}\t${row['Transaction Count']}\t${row['Phone Number']}`).join('\n');
+        copyButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            let headers, tsv;
+            if (popupId === 'churned-popup') {
+                headers = "First Name\tLast Name\tTransaction Count\tPhone Number\tStore Address\n";
+                tsv = data.map(row => `${row['First Name']}\t${row['Last Name']}\t${row['Transaction Count']}\t${row['Phone Number']}\t${row['Store Address'] || ''}`).join('\n');
+            } else {
+                headers = "First Name\tLast Name\tTransaction Count\tPhone Number\n";
+                tsv = data.map(row => `${row['First Name']}\t${row['Last Name']}\t${row['Transaction Count']}\t${row['Phone Number']}`).join('\n');
+            }
             navigator.clipboard.writeText(headers + tsv).then(() => {
                 copyButton.textContent = 'Copied!';
                 copyButton.classList.add('copied');
                 setTimeout(() => { copyButton.textContent = 'Copy All'; copyButton.classList.remove('copied'); }, 2000);
-            }).catch(err => console.error('Failed to copy text: ', err));
+            });
         });
+
         footer.appendChild(remainingText);
-        footer.appendChild(copyButton);
+        
+        const buttonsWrapper = document.createElement('div');
+        buttonsWrapper.className = 'flex items-center gap-2';
+        
+        if (popupId === 'churned-popup') {
+            const viewAllBtn = document.createElement('button');
+            viewAllBtn.textContent = 'View All';
+            viewAllBtn.className = 'popup-action-btn';
+            viewAllBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                expandChurnPopup(container, title, data);
+            });
+            buttonsWrapper.appendChild(viewAllBtn);
+        }
+        
+        buttonsWrapper.appendChild(copyButton);
+        footer.appendChild(buttonsWrapper);
+        
+        container.innerHTML = tableHTML;
+        container.appendChild(footer);
+    };
+
+    const expandChurnPopup = (container, title, data) => {
+        container.classList.add('expanded');
+        
+        const executiveOptions = `<option value="">Assign...</option>` + accountExecutives.map(name => `<option value="${name}">${name}</option>`).join('');
+
+        const tableHTML = `
+            <div class="p-4 border-b border-slate-200"><h3 class="font-semibold text-slate-700">${title} - Management View</h3></div>
+            <div class="popup-table-container">
+                <table class="popup-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Store Name</th>
+                            <th>Store Address</th>
+                            <th>Account Executive</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        ${data.map(row => `
+                        <tr>
+                            <td>${row['First Name']} ${row['Last Name']}</td>
+                            <td>${row['Phone Number']}</td>
+                            <td>${row['Store Name'] || 'N/A'}</td>
+                            <td>${row['Store Address'] || 'N/A'}</td>
+                            <td>
+                                <select class="account-exec-select" data-phone="${row['Phone Number']}">
+                                    ${executiveOptions}
+                                </select>
+                            </td>
+                        </tr>`).join('')}
+                    </tbody>
+                </table>
+            </div>`;
+        
+        const footer = document.createElement('div');
+        footer.className = 'popup-footer';
+        
+        const totalText = document.createElement('span');
+        totalText.textContent = `Total: ${data.length} users.`;
+        
+        const buttonsWrapper = document.createElement('div');
+        buttonsWrapper.className = 'flex items-center gap-2';
+
+        const collapseBtn = document.createElement('button');
+        collapseBtn.textContent = 'Collapse';
+        collapseBtn.className = 'popup-action-btn';
+        collapseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            createPopupTable('churned-popup', title, data);
+        });
+
+        const copyButton = document.createElement('button');
+        copyButton.textContent = 'Copy All';
+        copyButton.className = 'popup-copy-button';
+        copyButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const assignments = {};
+            container.querySelectorAll('.account-exec-select').forEach(select => {
+                assignments[select.dataset.phone] = select.value;
+            });
+            
+            const headers = "First Name\tLast Name\tPhone Number\tStore Name\tStore Address\tAccount Executive\n";
+            const tsv = data.map(row => {
+                const executive = assignments[row['Phone Number']] || '';
+                return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Store Name'] || ''}\t${row['Store Address'] || ''}\t${executive}`;
+            }).join('\n');
+
+            navigator.clipboard.writeText(headers + tsv).then(() => {
+                copyButton.textContent = 'Copied!';
+                copyButton.classList.add('copied');
+                setTimeout(() => { copyButton.textContent = 'Copy All'; copyButton.classList.remove('copied'); }, 2000);
+            });
+        });
+
+        footer.appendChild(totalText);
+        buttonsWrapper.appendChild(collapseBtn);
+        buttonsWrapper.appendChild(copyButton);
+        footer.appendChild(buttonsWrapper);
+        
+        container.innerHTML = tableHTML;
         container.appendChild(footer);
     };
 
@@ -277,7 +529,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800">${row['Last Name']}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${row['Phone Number']}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${row['LGA'] || 'N/A'}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${row['Store Name'] || 'N/A'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500" title="${row['Store Name'] || ''}">${truncateText(row['Store Name'])}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500" title="${row['Store Address'] || ''}">${truncateText(row['Store Address'])}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 font-medium">${row['Transaction Count']}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 font-medium">${new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(row['Total Amount'])}</td>
             `;
@@ -305,11 +558,22 @@ document.addEventListener('DOMContentLoaded', () => {
     fileInput2.addEventListener('change', () => handleFileUpload(fileInput2.files[0], 2));
     fetchApiBtn.addEventListener('click', handleApiFetch);
     
+    cohortToggle.addEventListener('change', () => {
+        cohortInputs.classList.toggle('hidden', !cohortToggle.checked);
+        churnInputs.classList.toggle('hidden', cohortToggle.checked);
+        resetDashboard();
+    });
+
     [uploadContainer1, uploadContainer2].forEach((container, index) => {
         container.addEventListener('dragover', (e) => { e.preventDefault(); if (!container.classList.contains('disabled')) container.classList.add('dragover'); });
-        container.addEventListener('dragleave', (e) => { e.preventDefault(); container.classList.remove('dragover'); });
+        container.addEventListener('dragleave', (e) => { e.preventDefault(); container.classList.remove('dragleave'); });
         container.addEventListener('drop', (e) => { e.preventDefault(); container.classList.remove('dragover'); if (!container.classList.contains('disabled')) { const files = e.dataTransfer.files; if (files.length) { const fileInput = index === 0 ? fileInput1 : fileInput2; fileInput.files = files; handleFileUpload(files[0], index + 1); } } });
     });
+
+    [apiStart1Input, apiEnd1Input].forEach(input => input.addEventListener('change', () => updateDateDisplay(apiStart1Input, apiEnd1Input, dateDisplay1)));
+    [apiStart2Input, apiEnd2Input].forEach(input => input.addEventListener('change', () => updateDateDisplay(apiStart2Input, apiEnd2Input, dateDisplay2)));
+    [apiStartChurnInput, apiEndChurnInput].forEach(input => input.addEventListener('change', () => updateDateDisplay(apiStartChurnInput, apiEndChurnInput, dateDisplayChurn)));
+
 
     const applyFilters = () => {
         const min = parseInt(minTransInput.value, 10);
@@ -323,7 +587,7 @@ document.addEventListener('DOMContentLoaded', () => {
     exportBtn.addEventListener('click', () => {
         if (filteredData.length === 0) { alert('No data to export.'); return; }
         const csv = Papa.unparse(filteredData, {
-            columns: ['First Name', 'Last Name', 'Phone Number', 'LGA', 'Store Name', 'Transaction Count', 'Total Amount']
+            columns: ['First Name', 'Last Name', 'Phone Number', 'LGA', 'Store Name', 'Store Address', 'Transaction Count', 'Total Amount']
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
@@ -336,50 +600,78 @@ document.addEventListener('DOMContentLoaded', () => {
         document.body.removeChild(link);
     });
 
-    // Date Presets Initialization
     const initDatePresets = () => {
         const presets = [
-            //{ label: 'Last 7 Days', days: 7 },
-            //{ label: 'Last 30 Days', days: 30 },
-            //{ label: 'This Month', type: 'month' },
-            //{ label: 'Last Month', type: 'last-month' },
+            { label: 'Last 7 Days', days: 7 }, { label: 'Last 30 Days', days: 30 },
+            { label: 'This Month', type: 'month' }, { label: 'Last Month', type: 'last-month' },
         ];
-
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-
-        const createButton = (preset, period) => {
+        const createButton = (preset, target) => {
             const btn = document.createElement('button');
             btn.className = 'date-preset-btn';
             btn.textContent = preset.label;
-            btn.type = 'button'; // Prevent form submission if ever inside a form
+            btn.type = 'button';
             btn.addEventListener('click', () => {
                 let start, end;
-                const toYYYYMMDD = (d) => d.toISOString().split('T')[0];
-
                 if (preset.type === 'month') {
                     start = new Date(today.getFullYear(), today.getMonth(), 1);
                     end = new Date(today.getFullYear(), today.getMonth() + 1, 0);
                 } else if (preset.type === 'last-month') {
                     start = new Date(today.getFullYear(), today.getMonth() - 1, 1);
                     end = new Date(today.getFullYear(), today.getMonth(), 0);
-                } else { // days
+                } else {
                     end = new Date(today);
                     start = new Date(today);
                     start.setDate(start.getDate() - (preset.days - 1));
                 }
-
-                document.getElementById(`api-start-${period}`).value = toYYYYMMDD(start);
-                document.getElementById(`api-end-${period}`).value = toYYYYMMDD(end);
+                if (target === 'churn') {
+                     apiStartChurnInput.value = toYYYYMMDD(start);
+                     apiEndChurnInput.value = toYYYYMMDD(end);
+                     updateDateDisplay(apiStartChurnInput, apiEndChurnInput, dateDisplayChurn);
+                }
             });
             return btn;
         };
-
-        presets.forEach(p => {
-            apiPresets1.appendChild(createButton(p, 1));
-            apiPresets2.appendChild(createButton(p, 2));
-        });
+        presets.forEach(p => apiPresetsChurn.appendChild(createButton(p, 'churn')));
     };
+
+    // Listener for the new viewport-centralized scroll indicator
+    tableScrollContainer.addEventListener('mouseenter', () => {
+        // Stop if the hint has been shown for this data load
+        if (hasShownScrollIndicator) return;
+
+        // Check if the table is actually scrollable
+        const isScrollable = tableScrollContainer.scrollWidth > tableScrollContainer.clientWidth;
+        if (isScrollable) {
+            hasShownScrollIndicator = true; // Set flag to true
+            
+            // Show the overlay
+            scrollIndicatorOverlay.classList.remove('hidden');
+            // A tiny delay ensures the CSS transition is applied correctly after display changes
+            setTimeout(() => {
+                scrollIndicatorOverlay.classList.add('is-visible');
+            }, 10);
+
+            // Set a timer to automatically hide the overlay after 2 seconds
+            indicatorTimeout = setTimeout(() => {
+                scrollIndicatorOverlay.classList.remove('is-visible');
+            }, 2000);
+        }
+    });
+
+    // Also allow the user to click the overlay to dismiss it early
+    scrollIndicatorOverlay.addEventListener('click', () => {
+        clearTimeout(indicatorTimeout); // Stop the automatic timer
+        scrollIndicatorOverlay.classList.remove('is-visible');
+    });
+
+    // Hide the overlay from the DOM after its fade-out transition finishes
+    scrollIndicatorOverlay.addEventListener('transitionend', () => {
+        if (!scrollIndicatorOverlay.classList.contains('is-visible')) {
+            scrollIndicatorOverlay.classList.add('hidden');
+        }
+    });
 
     initDatePresets();
 });
