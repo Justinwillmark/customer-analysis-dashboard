@@ -7,7 +7,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let dateRange1 = null;
     let dateRange2 = null;
     let charts = {};
-    let hasShownScrollIndicator = false;
+    let scrollHintCounter = 0;
     const accountExecutives = ['Chimezie Ezimoha', 'Waheed Ayinla', 'Abraham Ohworieha', 'Semilogo (for phone call)'];
 
     // --- DOM ELEMENTS (File Upload) ---
@@ -460,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
         
         if (popupId === 'churned-popup') {
             const viewAllBtn = document.createElement('button');
-            viewAllBtn.textContent = 'Expand';
+            viewAllBtn.textContent = 'Manage';
             viewAllBtn.className = 'popup-action-btn';
             viewAllBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -744,11 +744,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     tableScrollContainer.addEventListener('mouseenter', () => {
-        if (hasShownScrollIndicator) return;
-        
+        if (scrollHintCounter >= 2) return;
+
         const isScrollable = tableScrollContainer.scrollWidth > tableScrollContainer.clientWidth;
         if (isScrollable) {
-            hasShownScrollIndicator = true;
+            scrollHintCounter++;
             triggerScrollHintAnimation();
         }
     });
