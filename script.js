@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let filteredData = [];
     let dateRange1 = null;
     let dateRange2 = null;
+    let period2Label = null; // <-- To store the label from a preset button
     let charts = {};
     let scrollHintCounter = 0;
     let reportData = {};
@@ -25,7 +26,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DOM ELEMENTS (API Fetch) ---
     const apiUrlInput = document.getElementById('api-url');
     const fetchApiBtn = document.getElementById('fetch-api-data');
-    
+
     // Cohort Elements
     const cohortToggle = document.getElementById('cohort-toggle');
     const cohortInputs = document.getElementById('cohort-inputs');
@@ -53,6 +54,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const statusContainer = document.getElementById('status-container');
     const statusMessage = document.getElementById('status-message');
     const loader = document.getElementById('loader');
+    const loadingOverlay = document.getElementById('loading-overlay');
     const dataTable = document.getElementById('data-table');
     const tableTitle = document.getElementById('table-title');
     const tableScrollContainer = document.getElementById('table-scroll-container');
@@ -87,29 +89,29 @@ document.addEventListener('DOMContentLoaded', () => {
         showStatus(message, false);
         statusMessage.classList.add('text-red-600');
     };
-    
+
     const resetError = () => {
         statusMessage.classList.remove('text-red-600');
     }
 
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
-        const date = new Date(dateString); 
+        const date = new Date(dateString);
         // Check if the date is valid before formatting
         if (isNaN(date.getTime())) {
             return dateString; // Return original string if it's not a valid date
         }
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
-    
+
     const formatPeriodText = (range) => {
         if (!range || !range.start || range.start === 'File') return 'the selected file';
-        
+
         const startDate = new Date(range.start + 'T00:00:00');
         const endDate = new Date(range.end + 'T00:00:00');
         const startYear = startDate.getFullYear();
         const endYear = endDate.getFullYear();
-        
+
         if (startYear !== endYear) {
             return `${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
         } else {
@@ -118,7 +120,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const toYYYYMMDD = (d) => d.toISOString().split('T')[0];
-    
+
     const truncateText = (text, wordLimit = 3) => {
         if (!text) return 'N/A';
         const words = text.split(' ');
@@ -127,7 +129,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return text;
     };
-    
+
     const resetDashboard = () => {
         dashboard.classList.add('hidden');
         hideStatus();
@@ -138,6 +140,7 @@ document.addEventListener('DOMContentLoaded', () => {
         filteredData = [];
         dateRange1 = null;
         dateRange2 = null;
+        period2Label = null; // Reset the label
         reportData = {};
         reportInfoIcon.classList.add('hidden');
         hideReportModal();
@@ -166,7 +169,7 @@ document.addEventListener('DOMContentLoaded', () => {
         noResultsEl.classList.add('hidden');
         tableTitle.textContent = 'User Data';
         tableDescription.textContent = 'Select a period to see user data.';
-        
+
         fileInput1.value = '';
         fileInput2.value = '';
         fileName1.textContent = 'Drag & drop or click to upload';
@@ -227,11 +230,11 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (period !== 'churn') {
                         missingColumns = requiredColumns.filter(col => !results.meta.fields.includes(col));
                     }
-                     
+
                     if (missingColumns.length > 0) {
                         return reject(new Error(`Missing required columns in data: ${missingColumns.join(', ')}`));
                     }
-                    
+
                     const parsedData = results.data.map(row => ({
                         ...row,
                         'Transaction Count': parseInt(row['Transaction Count'], 10) || 0,
@@ -252,12 +255,13 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- DATA INPUT HANDLERS ---
     const handleFileUpload = (file, period) => {
         if (!file) return;
-        
+
         resetError();
         showStatus(`Processing ${file.name}...`);
-        
+        period2Label = 'the selected file'; // Set a generic label for file uploads
+
         const dateRange = { start: 'File', end: 'Data' };
-        
+
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
@@ -287,7 +291,7 @@ document.addEventListener('DOMContentLoaded', () => {
         let start1, end1, start2, end2;
 
         resetError();
-        
+
         if (cohortToggle.checked) {
             start1 = apiStart1Input.value; end1 = apiEnd1Input.value;
             start2 = apiStart2Input.value; end2 = apiEnd2Input.value;
@@ -311,16 +315,17 @@ document.addEventListener('DOMContentLoaded', () => {
             end1 = toYYYYMMDD(period1EndDate);
         }
 
+        loadingOverlay.classList.remove('hidden'); // <-- Show overlay
         showStatus('Fetching data from API...');
         dateRange1 = { start: start1, end: end1 };
         dateRange2 = { start: start2, end: end2 };
-        
+
         const retentionEndpoint = baseUrl.replace('/churn', '/retention');
         const url1 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start1}&endDate=${end1}`;
         const url2 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start2}&endDate=${end2}`;
         // New endpoint for churned users, using Period 1 dates
         const churnUrl = `${retentionEndpoint}?download=churned-users&startDate=${start1}&endDate=${end1}`;
-        
+
         try {
             const [response1, response2, churnResponse] = await Promise.all([fetch(url1), fetch(url2), fetch(churnUrl)]);
 
@@ -329,9 +334,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (!churnResponse.ok) throw new Error(`API error for Churn Data: ${churnResponse.status} ${churnResponse.statusText}`);
 
             const [csvText1, csvText2, churnCsvText] = await Promise.all([response1.text(), response2.text(), churnResponse.text()]);
-            
+
             await Promise.all([
-                parseAndProcessData(csvText1, 1), 
+                parseAndProcessData(csvText1, 1),
                 parseAndProcessData(csvText2, 2),
                 parseAndProcessData(churnCsvText, 'churn') // Parse the new churn data
             ]);
@@ -339,6 +344,8 @@ document.addEventListener('DOMContentLoaded', () => {
         } catch (error) {
             console.error(error);
             showError(`Failed to fetch or process API data. Error: ${error.message}`);
+        } finally {
+            loadingOverlay.classList.add('hidden'); // <-- Hide overlay
         }
     };
 
@@ -354,28 +361,28 @@ document.addEventListener('DOMContentLoaded', () => {
     const analyzeData = () => {
         showStatus('Analyzing data...');
         hasShownScrollIndicator = false; // Reset the indicator flag for the new data
-        
+
         const usersP1PhoneNumbers = new Set(dataPeriod1.map(u => u['Phone Number']));
         const usersP2PhoneNumbers = new Set(dataPeriod2.map(u => u['Phone Number']));
-        
+
         const retainedUsersSet = new Set([...usersP1PhoneNumbers].filter(phone => usersP2PhoneNumbers.has(phone)));
         const newUsersSet = new Set([...usersP2PhoneNumbers].filter(phone => !usersP1PhoneNumbers.has(phone)));
-        
+
         let relevantChurnData;
         // If churnDataPeriod has been populated by the API, filter it.
         // Otherwise (for file upload), calculate it locally.
         if (churnDataPeriod.length > 0) {
-             relevantChurnData = churnDataPeriod.filter(churnedUser => 
+             relevantChurnData = churnDataPeriod.filter(churnedUser =>
                 usersP1PhoneNumbers.has(churnedUser['Phone Number'])
             );
         } else {
             const churnedPhoneNumbers = new Set([...usersP1PhoneNumbers].filter(phone => !usersP2PhoneNumbers.has(phone)));
             relevantChurnData = dataPeriod1.filter(user => churnedPhoneNumbers.has(user['Phone Number']));
         }
-        
+
         const churnedUsersCount = relevantChurnData.length;
         const retentionRate = usersP1PhoneNumbers.size > 0 ? (retainedUsersSet.size / usersP1PhoneNumbers.size * 100).toFixed(1) : 0;
-        
+
         document.getElementById('retention-rate').textContent = `${retentionRate}%`;
         document.getElementById('retained-users').textContent = retainedUsersSet.size;
         document.getElementById('new-users').textContent = newUsersSet.size;
@@ -384,7 +391,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const period1Text = formatPeriodText(dateRange1);
         const period2Text = formatPeriodText(dateRange2);
-        
+
         document.getElementById('retained-when').textContent = `from ${period2Text}`;
         document.getElementById('new-when').textContent = `from ${period2Text}`;
         document.getElementById('churned-when').textContent = `from ${period1Text}`;
@@ -402,23 +409,23 @@ document.addEventListener('DOMContentLoaded', () => {
         tableDescription.textContent = `Showing ${dataPeriod2.length} total users in this period.`;
 
         renderCharts({ p1: { count: usersP1PhoneNumbers.size }, p2: { count: usersP2PhoneNumbers.size }, retained: retainedUsersSet.size });
-        
+
         const totalTransactionsP1 = dataPeriod1.reduce((sum, u) => sum + (u['Transaction Count'] || 0), 0);
         const totalTransactionsP2 = dataPeriod2.reduce((sum, u) => sum + (u['Transaction Count'] || 0), 0);
         const totalAmountP1 = dataPeriod1.reduce((sum, u) => sum + (u['Total Amount'] || 0), 0);
         const totalAmountP2 = dataPeriod2.reduce((sum, u) => sum + (u['Total Amount'] || 0), 0);
-        
+
         renderTransactionChart({ p1: { count: totalTransactionsP1, amount: totalAmountP1 }, p2: { count: totalTransactionsP2, amount: totalAmountP2 } });
 
         // --- Store data for report generation ---
         reportData = {
             retentionRate: retentionRate,
-            retainedUsers: retainedUsersSet.size,
             newUsers: newUsersSet.size,
             churnedUsers: churnedUsersCount,
             totalActiveUsers: usersP2PhoneNumbers.size,
             period1: period1Text,
             period2: period2Text,
+            periodLabel: period2Label, // Add the preset label to the report data
             isApiMode: !fileInput1.files[0], // True if analysis was run via API
             apiParams: {
                 start1: apiStart1Input.value,
@@ -465,24 +472,59 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // 2. Generate Report Text
-        const timestamp = new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
-        const summaryText = `Date & Time Stamp of generated report:
-${timestamp}
+        const timestamp = new Date().toLocaleString('en-US', {
+            weekday: 'long',
+            year: 'numeric',
+            month: 'long',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit'
+        });
 
-Report Summary:
-- ${reportData.retentionRate}% of retailers who used Pika App in ${reportData.period1} also used it in ${reportData.period2}.
-- There were ${reportData.newUsers} new users (new onboards + reactivated i.e people who did not use it in the first period but showed up in the second period).
-- ${reportData.churnedUsers} churned users from the ${reportData.period1}.
-- A total of ${reportData.totalActiveUsers} active users for the ${reportData.period2}.
+        let summaryText;
+
+        // Use "Example B" format if a preset was clicked, otherwise use "Example A"
+        if (reportData.periodLabel) {
+            const label = reportData.periodLabel.toLowerCase();
+            summaryText = `Report Summary for ${label}: ${reportData.period2} (Auto-generated with Pika-RS.)
+
+Date & Time Stamp of Generated Report: ${timestamp}
+
+• ${reportData.retentionRate}% of retailers who used Pika App in the prior period (${reportData.period1}) also used it in ${label}.
+
+• There were ${reportData.newUsers} new users in ${label}: New onboards + reactivated (i.e. people who did not use it in the first period but showed up in the second period).
+
+• We've recorded ${reportData.churnedUsers} churned users from the prior period.
+
+• And a total of ${reportData.totalActiveUsers} active users in ${label}.
 
 Verification Link:
 ${analysisUrl}`;
+        } else {
+            // Fallback to the more detailed "Example A" format
+            summaryText = `Report Summary for ${reportData.period2} (Auto-generated with Pika-RS.)
+
+Date & Time Stamp of Generated Report: ${timestamp}
+
+• ${reportData.retentionRate}% of retailers who used Pika App in the prior period (${reportData.period1}) also used it in ${reportData.period2}.
+
+• There were ${reportData.newUsers} new users: New onboards + reactivated (i.e. people who did not use it in the first period but showed up in the second period).
+
+• We've recorded ${reportData.churnedUsers} churned users from the prior period (${reportData.period1}).
+
+• And a total of ${reportData.totalActiveUsers} active users for ${reportData.period2}.
+
+Verification Link:
+${analysisUrl}`;
+        }
+
 
         // 3. Populate and show modal
         reportContent.textContent = summaryText;
         reportModal.classList.remove('hidden');
         reportModalOverlay.classList.remove('hidden');
     };
+
 
     const hideReportModal = () => {
         reportModal.classList.add('hidden');
@@ -523,13 +565,13 @@ ${analysisUrl}`;
                     <tbody>${data.slice(0, 10).map(row => `<tr><td>${row['First Name']} ${row['Last Name']}</td><td style="text-align: center;">${row['Transaction Count'] || 'N/A'}</td><td>${row['Phone Number']}</td></tr>`).join('')}</tbody>
                 </table>
             </div>`;
-        
+
         const footer = document.createElement('div');
         footer.className = 'popup-footer';
-        
+
         const remainingText = document.createElement('span');
         remainingText.textContent = data.length > 10 ? `...and ${data.length - 10} more.` : `Total: ${data.length} users.`;
-        
+
         const copyButton = document.createElement('button');
         copyButton.textContent = 'Copy All';
         copyButton.className = 'popup-copy-button';
@@ -554,10 +596,10 @@ ${analysisUrl}`;
         });
 
         footer.appendChild(remainingText);
-        
+
         const buttonsWrapper = document.createElement('div');
         buttonsWrapper.className = 'flex items-center gap-2';
-        
+
         if (popupId === 'churned-popup') {
             const viewAllBtn = document.createElement('button');
             viewAllBtn.textContent = 'Manage';
@@ -568,17 +610,17 @@ ${analysisUrl}`;
             });
             buttonsWrapper.appendChild(viewAllBtn);
         }
-        
+
         buttonsWrapper.appendChild(copyButton);
         footer.appendChild(buttonsWrapper);
-        
+
         container.innerHTML = tableHTML;
         container.appendChild(footer);
     };
 
     const expandChurnPopup = (container, title, data) => {
         container.classList.add('expanded');
-        
+
         const executiveOptions = `<option value="">Assign...</option>` + accountExecutives.map(name => `<option value="${name}">${name}</option>`).join('');
 
         const tableHTML = `
@@ -612,13 +654,13 @@ ${analysisUrl}`;
                     </tbody>
                 </table>
             </div>`;
-        
+
         const footer = document.createElement('div');
         footer.className = 'popup-footer';
-        
+
         const totalText = document.createElement('span');
         totalText.textContent = `Total: ${data.length} users.`;
-        
+
         const buttonsWrapper = document.createElement('div');
         buttonsWrapper.className = 'flex items-center gap-2';
 
@@ -639,7 +681,7 @@ ${analysisUrl}`;
             container.querySelectorAll('.account-exec-select').forEach(select => {
                 assignments[select.dataset.phone] = select.value;
             });
-            
+
             const headers = "First Name\tLast Name\tPhone Number\tStore Name\tStore Address\tLast Sale Date\tAccount Executive\n";
             const tsv = data.map(row => {
                 const executive = assignments[row['Phone Number']] || '';
@@ -658,7 +700,7 @@ ${analysisUrl}`;
         buttonsWrapper.appendChild(collapseBtn);
         buttonsWrapper.appendChild(copyButton);
         footer.appendChild(buttonsWrapper);
-        
+
         container.innerHTML = tableHTML;
         container.appendChild(footer);
     };
@@ -702,7 +744,7 @@ ${analysisUrl}`;
     fileInput1.addEventListener('change', () => handleFileUpload(fileInput1.files[0], 1));
     fileInput2.addEventListener('change', () => handleFileUpload(fileInput2.files[0], 2));
     fetchApiBtn.addEventListener('click', handleApiFetch);
-    
+
     // Report Modal Listeners
     reportInfoIcon.addEventListener('click', showReportModal);
     closeReportBtn.addEventListener('click', hideReportModal);
@@ -719,6 +761,13 @@ ${analysisUrl}`;
         container.addEventListener('dragover', (e) => { e.preventDefault(); if (!container.classList.contains('disabled')) container.classList.add('dragover'); });
         container.addEventListener('dragleave', (e) => { e.preventDefault(); container.classList.remove('dragleave'); });
         container.addEventListener('drop', (e) => { e.preventDefault(); container.classList.remove('dragover'); if (!container.classList.contains('disabled')) { const files = e.dataTransfer.files; if (files.length) { const fileInput = index === 0 ? fileInput1 : fileInput2; fileInput.files = files; handleFileUpload(files[0], index + 1); } } });
+    });
+
+    // Reset preset label if manual date is entered
+    [apiStart1Input, apiEnd1Input, apiStart2Input, apiEnd2Input, apiStartChurnInput, apiEndChurnInput].forEach(input => {
+        input.addEventListener('change', () => {
+             period2Label = null;
+        });
     });
 
     [apiStart1Input, apiEnd1Input].forEach(input => input.addEventListener('change', () => updateDateDisplay(apiStart1Input, apiEnd1Input, dateDisplay1)));
@@ -749,7 +798,7 @@ ${analysisUrl}`;
                        lga.includes(searchTerm) ||
                        store.includes(searchTerm);
             }
-            
+
             return true;
         });
         renderTable(filteredData);
@@ -782,7 +831,8 @@ ${analysisUrl}`;
         ];
         const today = new Date();
         today.setHours(0, 0, 0, 0);
-        const createButton = (preset, target) => {
+
+        const createButton = (preset, targetConfig) => {
             const btn = document.createElement('button');
             btn.className = 'date-preset-btn';
             btn.textContent = preset.label;
@@ -800,15 +850,28 @@ ${analysisUrl}`;
                     start = new Date(today);
                     start.setDate(start.getDate() - (preset.days - 1));
                 }
-                if (target === 'churn') {
-                     apiStartChurnInput.value = toYYYYMMDD(start);
-                     apiEndChurnInput.value = toYYYYMMDD(end);
-                     updateDateDisplay(apiStartChurnInput, apiEndChurnInput, dateDisplayChurn);
+                targetConfig.startInput.value = toYYYYMMDD(start);
+                targetConfig.endInput.value = toYYYYMMDD(end);
+                updateDateDisplay(targetConfig.startInput, targetConfig.endInput, targetConfig.displayContainer);
+
+                // If this preset is for period 2, store its label for the report
+                if (targetConfig.isPeriod2) {
+                    period2Label = preset.label;
                 }
             });
             return btn;
         };
-        presets.forEach(p => apiPresetsChurn.appendChild(createButton(p, 'churn')));
+
+        const targets = [
+            { container: apiPresets1, startInput: apiStart1Input, endInput: apiEnd1Input, displayContainer: dateDisplay1, isPeriod2: false },
+            { container: apiPresets2, startInput: apiStart2Input, endInput: apiEnd2Input, displayContainer: dateDisplay2, isPeriod2: true },
+            { container: apiPresetsChurn, startInput: apiStartChurnInput, endInput: apiEndChurnInput, displayContainer: dateDisplayChurn, isPeriod2: true },
+        ];
+
+        targets.forEach(target => {
+            target.container.innerHTML = ''; // Clear existing
+            presets.forEach(p => target.container.appendChild(createButton(p, target)));
+        });
     };
 
     // --- Intuitive Scroll Hint Animation ---
@@ -876,12 +939,15 @@ ${analysisUrl}`;
             apiStartChurnInput.value = urlParams.get('startChurn') || '';
             apiEndChurnInput.value = urlParams.get('endChurn') || '';
         }
-        
+
         // Trigger change events on all inputs to update the visual date displays
         [apiStart1Input, apiEnd1Input, apiStart2Input, apiEnd2Input, apiStartChurnInput, apiEndChurnInput].forEach(input => {
             if (input.value) input.dispatchEvent(new Event('change'));
         });
         
+        // When autorunning, we don't know the preset label, so we clear it.
+        period2Label = null;
+
         // Use a small timeout to ensure the UI has updated before fetching
         setTimeout(() => {
             fetchApiBtn.click();
