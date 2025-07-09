@@ -8,6 +8,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let dateRange2 = null;
     let charts = {};
     let scrollHintCounter = 0;
+    let reportData = {};
     const accountExecutives = ['Chimezie Ezimoha', 'Waheed Ayinla', 'Abraham Ohworieha', 'Semilogo (for phone call)'];
 
     // --- DOM ELEMENTS (File Upload) ---
@@ -61,6 +62,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBtn = document.getElementById('export-csv');
     const noResultsEl = document.getElementById('no-results');
     const tableDescription = document.getElementById('table-description');
+
+    // --- REPORT MODAL ELEMENTS ---
+    const reportInfoIcon = document.getElementById('report-info-icon');
+    const reportModalOverlay = document.getElementById('report-modal-overlay');
+    const reportModal = document.getElementById('report-modal');
+    const reportContent = document.getElementById('report-content');
+    const copyReportBtn = document.getElementById('copy-report-btn');
+    const closeReportBtn = document.getElementById('close-report-btn');
 
     // --- HELPER FUNCTIONS ---
     const showStatus = (message, showLoader = true) => {
@@ -129,6 +138,9 @@ document.addEventListener('DOMContentLoaded', () => {
         filteredData = [];
         dateRange1 = null;
         dateRange2 = null;
+        reportData = {};
+        reportInfoIcon.classList.add('hidden');
+        hideReportModal();
 
         destroyCharts();
 
@@ -398,6 +410,28 @@ document.addEventListener('DOMContentLoaded', () => {
         
         renderTransactionChart({ p1: { count: totalTransactionsP1, amount: totalAmountP1 }, p2: { count: totalTransactionsP2, amount: totalAmountP2 } });
 
+        // --- Store data for report generation ---
+        reportData = {
+            retentionRate: retentionRate,
+            retainedUsers: retainedUsersSet.size,
+            newUsers: newUsersSet.size,
+            churnedUsers: churnedUsersCount,
+            totalActiveUsers: usersP2PhoneNumbers.size,
+            period1: period1Text,
+            period2: period2Text,
+            isApiMode: !fileInput1.files[0], // True if analysis was run via API
+            apiParams: {
+                start1: apiStart1Input.value,
+                end1: apiEnd1Input.value,
+                start2: apiStart2Input.value,
+                end2: apiEnd2Input.value,
+                churnStart: apiStartChurnInput.value,
+                churnEnd: apiEndChurnInput.value,
+                isCohort: cohortToggle.checked
+            }
+        };
+        reportInfoIcon.classList.remove('hidden'); // Show the icon now
+
         applyFilters();
 
         hideStatus();
@@ -405,6 +439,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
         dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
+
+    // --- REPORT MODAL FUNCTIONS ---
+    const showReportModal = () => {
+        if (Object.keys(reportData).length === 0) return;
+
+        // 1. Generate verification URL
+        const baseUrl = window.location.href.split('?')[0];
+        let analysisUrl = baseUrl; // Fallback for file uploads
+
+        if (reportData.isApiMode) {
+            const params = new URLSearchParams();
+            params.append('autorun', 'true');
+            params.append('isCohort', reportData.apiParams.isCohort);
+            if (reportData.apiParams.isCohort) {
+                params.append('start1', reportData.apiParams.start1);
+                params.append('end1', reportData.apiParams.end1);
+                params.append('start2', reportData.apiParams.start2);
+                params.append('end2', reportData.apiParams.end2);
+            } else {
+                params.append('startChurn', reportData.apiParams.churnStart);
+                params.append('endChurn', reportData.apiParams.churnEnd);
+            }
+            analysisUrl = `${baseUrl}?${params.toString()}`;
+        }
+
+        // 2. Generate Report Text
+        const timestamp = new Date().toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' });
+        const summaryText = `Date & Time Stamp of generated report:
+${timestamp}
+
+Report Summary:
+- ${reportData.retentionRate}% of retailers who used Pika App in ${reportData.period1} also used it in ${reportData.period2}.
+- There were ${reportData.newUsers} new users (new onboards + reactivated i.e people who did not use it in the first period but showed up in the second period).
+- ${reportData.churnedUsers} churned users from the ${reportData.period1}.
+- A total of ${reportData.totalActiveUsers} active users for the ${reportData.period2}.
+
+Verification Link:
+${analysisUrl}`;
+
+        // 3. Populate and show modal
+        reportContent.textContent = summaryText;
+        reportModal.classList.remove('hidden');
+        reportModalOverlay.classList.remove('hidden');
+    };
+
+    const hideReportModal = () => {
+        reportModal.classList.add('hidden');
+        reportModalOverlay.classList.add('hidden');
+    };
+
+    const copyReport = () => {
+        navigator.clipboard.writeText(reportContent.textContent).then(() => {
+            copyReportBtn.textContent = 'Copied!';
+            copyReportBtn.classList.add('bg-green-600', 'hover:bg-green-700');
+            copyReportBtn.classList.remove('bg-blue-600', 'hover:bg-blue-700');
+            setTimeout(() => {
+                copyReportBtn.textContent = 'Copy Report';
+                copyReportBtn.classList.remove('bg-green-600', 'hover:bg-green-700');
+                copyReportBtn.classList.add('bg-blue-600', 'hover:bg-blue-700');
+            }, 2000);
+        }).catch(err => {
+            console.error('Failed to copy report: ', err);
+            alert('Failed to copy report.');
+        });
+    };
+
 
     // --- RENDERING FUNCTIONS ---
     const createPopupTable = (popupId, title, data) => {
@@ -603,6 +703,12 @@ document.addEventListener('DOMContentLoaded', () => {
     fileInput2.addEventListener('change', () => handleFileUpload(fileInput2.files[0], 2));
     fetchApiBtn.addEventListener('click', handleApiFetch);
     
+    // Report Modal Listeners
+    reportInfoIcon.addEventListener('click', showReportModal);
+    closeReportBtn.addEventListener('click', hideReportModal);
+    reportModalOverlay.addEventListener('click', hideReportModal);
+    copyReportBtn.addEventListener('click', copyReport);
+
     cohortToggle.addEventListener('change', () => {
         cohortInputs.classList.toggle('hidden', !cohortToggle.checked);
         churnInputs.classList.toggle('hidden', cohortToggle.checked);
@@ -753,5 +859,35 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
+    const autorunFromUrl = () => {
+        const urlParams = new URLSearchParams(window.location.search);
+        if (urlParams.get('autorun') !== 'true') return;
+
+        const isCohort = urlParams.get('isCohort') === 'true';
+        cohortToggle.checked = isCohort;
+        cohortToggle.dispatchEvent(new Event('change')); // Trigger UI toggle
+
+        if (isCohort) {
+            apiStart1Input.value = urlParams.get('start1') || '';
+            apiEnd1Input.value = urlParams.get('end1') || '';
+            apiStart2Input.value = urlParams.get('start2') || '';
+            apiEnd2Input.value = urlParams.get('end2') || '';
+        } else {
+            apiStartChurnInput.value = urlParams.get('startChurn') || '';
+            apiEndChurnInput.value = urlParams.get('endChurn') || '';
+        }
+        
+        // Trigger change events on all inputs to update the visual date displays
+        [apiStart1Input, apiEnd1Input, apiStart2Input, apiEnd2Input, apiStartChurnInput, apiEndChurnInput].forEach(input => {
+            if (input.value) input.dispatchEvent(new Event('change'));
+        });
+        
+        // Use a small timeout to ensure the UI has updated before fetching
+        setTimeout(() => {
+            fetchApiBtn.click();
+        }, 100);
+    };
+
     initDatePresets();
+    autorunFromUrl(); // Check for autorun params on page load
 });
