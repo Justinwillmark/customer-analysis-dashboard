@@ -632,6 +632,7 @@ ${analysisUrl}`;
                             <th>Name</th>
                             <th>Phone</th>
                             <th>Store Name</th>
+                            <th>LGA</th>
                             <th>Store Address</th>
                             <th style="min-width: 100px;">Last Sale Date</th>
                             <th>Account Executive</th>
@@ -643,6 +644,7 @@ ${analysisUrl}`;
                             <td>${row['First Name']} ${row['Last Name']}</td>
                             <td>${row['Phone Number']}</td>
                             <td>${row['Store Name'] || 'N/A'}</td>
+                            <td>${row['LGA'] || 'N/A'}</td>
                             <td>${row['Store Address'] || 'N/A'}</td>
                             <td>${formatDate(row['Created Date'])}</td>
                             <td>
@@ -682,11 +684,11 @@ ${analysisUrl}`;
                 assignments[select.dataset.phone] = select.value;
             });
 
-            const headers = "First Name\tLast Name\tPhone Number\tStore Name\tStore Address\tLast Sale Date\tAccount Executive\n";
+            const headers = "First Name\tLast Name\tPhone Number\tStore Name\tLGA\tStore Address\tLast Sale Date\tAccount Executive\n";
             const tsv = data.map(row => {
                 const executive = assignments[row['Phone Number']] || '';
                 const formattedDate = formatDate(row['Created Date']);
-                return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Store Name'] || ''}\t${row['Store Address'] || ''}\t${formattedDate === 'N/A' ? '' : formattedDate}\t${executive}`;
+                return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Store Name'] || ''}\t${row['LGA'] || ''}\t${row['Store Address'] || ''}\t${formattedDate === 'N/A' ? '' : formattedDate}\t${executive}`;
             }).join('\n');
 
             navigator.clipboard.writeText(headers + tsv).then(() => {
