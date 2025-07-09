@@ -35,6 +35,34 @@ body {
     opacity: 0.6;
 }
 
+/* NEW: Styles for the collapsible file upload section */
+.file-upload-details > summary {
+    list-style: none;
+    padding: 1rem 1.5rem;
+    font-weight: 600;
+    color: #334155; /* slate-700 */
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.file-upload-details > summary::-webkit-details-marker {
+    display: none;
+}
+.file-upload-details > summary::before {
+    content: '▶';
+    display: inline-block;
+    margin-right: 0.75rem;
+    font-size: 0.8em;
+    transform: rotate(0deg);
+    transition: transform 0.2s;
+}
+.file-upload-details[open] > summary {
+    background-color: #f1f5f9; /* slate-100 */
+}
+.file-upload-details[open] > summary::before {
+    transform: rotate(90deg);
+}
+
+
 /* API Details/Summary Styles */
 .api-details > summary {
     list-style: none; /* Remove default marker */
@@ -317,6 +345,33 @@ input:checked + .slider:before {
     min-width: 160px;
     font-size: 0.75rem;
     background-color: #fff;
+}
+
+/* NEW: Styles for monitor creation tools */
+.monitor-tools {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+}
+.monitor-due-date-input {
+    font-size: 0.75rem;
+    padding: 0.25rem;
+    border: 1px solid #cbd5e1;
+    border-radius: 0.375rem;
+}
+.create-monitor-btn {
+    background-color: #16a34a; /* green-600 */
+    color: white;
+    font-weight: 500;
+    font-size: 0.75rem;
+    padding: 0.25rem 0.75rem;
+    border: none;
+    border-radius: 0.375rem;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.create-monitor-btn:hover {
+    background-color: #15803d; /* green-700 */
 }
 
 .hidden {

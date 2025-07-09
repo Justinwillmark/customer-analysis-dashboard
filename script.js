@@ -97,9 +97,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const formatDate = (dateString) => {
         if (!dateString) return 'N/A';
         const date = new Date(dateString);
-        // Check if the date is valid before formatting
         if (isNaN(date.getTime())) {
-            return dateString; // Return original string if it's not a valid date
+            return dateString;
         }
         return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
     };
@@ -129,6 +128,28 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         return text;
     };
+    
+    const getDurationString = (startDateStr, endDateStr, isPriorPeriod = false) => {
+        const start = new Date(startDateStr + 'T00:00:00');
+        const end = new Date(endDateStr + 'T00:00:00');
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+
+        const diffTime = Math.abs(end - start);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+
+        const isRecent = end.getTime() === today.getTime() || end.getTime() === today.getTime() - (1000 * 60 * 60 * 24);
+
+        if (isRecent && !isPriorPeriod) {
+            return `the last ${diffDays} days`;
+        }
+        
+        if (isPriorPeriod) {
+            return `the prior ${diffDays}-day period`;
+        }
+        
+        return `the ${diffDays}-day period`;
+    };
 
     const resetDashboard = () => {
         dashboard.classList.add('hidden');
@@ -140,7 +161,7 @@ document.addEventListener('DOMContentLoaded', () => {
         filteredData = [];
         dateRange1 = null;
         dateRange2 = null;
-        period2Label = null; // Reset the label
+        period2Label = null;
         reportData = {};
         reportInfoIcon.classList.add('hidden');
         hideReportModal();
@@ -226,7 +247,6 @@ document.addEventListener('DOMContentLoaded', () => {
                     const requiredColumns = ['First Name', 'Last Name', 'Phone Number', 'Transaction Count', 'Total Amount'];
                     let missingColumns = [];
 
-                    // The churn data has different columns, so we skip the check for it
                     if (period !== 'churn') {
                         missingColumns = requiredColumns.filter(col => !results.meta.fields.includes(col));
                     }
@@ -252,20 +272,18 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     };
 
-    // --- DATA INPUT HANDLERS ---
     const handleFileUpload = (file, period) => {
         if (!file) return;
 
         resetError();
         showStatus(`Processing ${file.name}...`);
-        period2Label = 'the selected file'; // Set a generic label for file uploads
+        period2Label = null; 
 
         const dateRange = { start: 'File', end: 'Data' };
 
         const reader = new FileReader();
         reader.onload = async (e) => {
             try {
-                // For file uploads, churn is calculated locally since there's no third file
                 await parseAndProcessData(e.target.result, period);
                 if (period === 1) {
                     dateRange1 = dateRange;
@@ -315,7 +333,7 @@ document.addEventListener('DOMContentLoaded', () => {
             end1 = toYYYYMMDD(period1EndDate);
         }
 
-        loadingOverlay.classList.remove('hidden'); // <-- Show overlay
+        loadingOverlay.classList.remove('hidden'); 
         showStatus('Fetching data from API...');
         dateRange1 = { start: start1, end: end1 };
         dateRange2 = { start: start2, end: end2 };
@@ -323,7 +341,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const retentionEndpoint = baseUrl.replace('/churn', '/retention');
         const url1 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start1}&endDate=${end1}`;
         const url2 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start2}&endDate=${end2}`;
-        // New endpoint for churned users, using Period 1 dates
         const churnUrl = `${retentionEndpoint}?download=churned-users&startDate=${start1}&endDate=${end1}`;
 
         try {
@@ -338,14 +355,14 @@ document.addEventListener('DOMContentLoaded', () => {
             await Promise.all([
                 parseAndProcessData(csvText1, 1),
                 parseAndProcessData(csvText2, 2),
-                parseAndProcessData(churnCsvText, 'churn') // Parse the new churn data
+                parseAndProcessData(churnCsvText, 'churn')
             ]);
             analyzeData();
         } catch (error) {
             console.error(error);
             showError(`Failed to fetch or process API data. Error: ${error.message}`);
         } finally {
-            loadingOverlay.classList.add('hidden'); // <-- Hide overlay
+            loadingOverlay.classList.add('hidden');
         }
     };
 
@@ -357,10 +374,9 @@ document.addEventListener('DOMContentLoaded', () => {
         fileName2.textContent = 'Drag & drop or click to upload';
     };
 
-    // --- CORE ANALYSIS LOGIC ---
     const analyzeData = () => {
         showStatus('Analyzing data...');
-        hasShownScrollIndicator = false; // Reset the indicator flag for the new data
+        hasShownScrollIndicator = false; 
 
         const usersP1PhoneNumbers = new Set(dataPeriod1.map(u => u['Phone Number']));
         const usersP2PhoneNumbers = new Set(dataPeriod2.map(u => u['Phone Number']));
@@ -369,8 +385,6 @@ document.addEventListener('DOMContentLoaded', () => {
         const newUsersSet = new Set([...usersP2PhoneNumbers].filter(phone => !usersP1PhoneNumbers.has(phone)));
 
         let relevantChurnData;
-        // If churnDataPeriod has been populated by the API, filter it.
-        // Otherwise (for file upload), calculate it locally.
         if (churnDataPeriod.length > 0) {
              relevantChurnData = churnDataPeriod.filter(churnedUser =>
                 usersP1PhoneNumbers.has(churnedUser['Phone Number'])
@@ -417,27 +431,24 @@ document.addEventListener('DOMContentLoaded', () => {
 
         renderTransactionChart({ p1: { count: totalTransactionsP1, amount: totalAmountP1 }, p2: { count: totalTransactionsP2, amount: totalAmountP2 } });
 
-        // --- Store data for report generation ---
         reportData = {
             retentionRate: retentionRate,
             newUsers: newUsersSet.size,
             churnedUsers: churnedUsersCount,
             totalActiveUsers: usersP2PhoneNumbers.size,
-            period1: period1Text,
-            period2: period2Text,
-            periodLabel: period2Label, // Add the preset label to the report data
-            isApiMode: !fileInput1.files[0], // True if analysis was run via API
+            period1Text: period1Text,
+            period2Text: period2Text,
+            periodLabel: period2Label,
+            isApiMode: !fileInput1.files[0],
             apiParams: {
-                start1: apiStart1Input.value,
-                end1: apiEnd1Input.value,
-                start2: apiStart2Input.value,
-                end2: apiEnd2Input.value,
-                churnStart: apiStartChurnInput.value,
-                churnEnd: apiEndChurnInput.value,
+                start1: dateRange1 ? dateRange1.start : null,
+                end1: dateRange1 ? dateRange1.end : null,
+                start2: dateRange2 ? dateRange2.start : null,
+                end2: dateRange2 ? dateRange2.end : null,
                 isCohort: cohortToggle.checked
             }
         };
-        reportInfoIcon.classList.remove('hidden'); // Show the icon now
+        reportInfoIcon.classList.remove('hidden');
 
         applyFilters();
 
@@ -447,31 +458,9 @@ document.addEventListener('DOMContentLoaded', () => {
         dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
-    // --- REPORT MODAL FUNCTIONS ---
     const showReportModal = () => {
         if (Object.keys(reportData).length === 0) return;
 
-        // 1. Generate verification URL
-        const baseUrl = window.location.href.split('?')[0];
-        let analysisUrl = baseUrl; // Fallback for file uploads
-
-        if (reportData.isApiMode) {
-            const params = new URLSearchParams();
-            params.append('autorun', 'true');
-            params.append('isCohort', reportData.apiParams.isCohort);
-            if (reportData.apiParams.isCohort) {
-                params.append('start1', reportData.apiParams.start1);
-                params.append('end1', reportData.apiParams.end1);
-                params.append('start2', reportData.apiParams.start2);
-                params.append('end2', reportData.apiParams.end2);
-            } else {
-                params.append('startChurn', reportData.apiParams.churnStart);
-                params.append('endChurn', reportData.apiParams.churnEnd);
-            }
-            analysisUrl = `${baseUrl}?${params.toString()}`;
-        }
-
-        // 2. Generate Report Text
         const timestamp = new Date().toLocaleString('en-US', {
             weekday: 'long',
             year: 'numeric',
@@ -480,51 +469,52 @@ document.addEventListener('DOMContentLoaded', () => {
             hour: 'numeric',
             minute: '2-digit'
         });
-
+        
         let summaryText;
 
-        // Use "Example B" format if a preset was clicked, otherwise use "Example A"
-        if (reportData.periodLabel) {
-            const label = reportData.periodLabel.toLowerCase();
-            summaryText = `Report Summary for ${label}: ${reportData.period2} (Auto-generated with Pika-RS.)
+        if (reportData.isApiMode) {
+            const p2DateRange = formatPeriodText({start: reportData.apiParams.start2, end: reportData.apiParams.end2});
+            const durationP2 = (reportData.periodLabel || getDurationString(reportData.apiParams.start2, reportData.apiParams.end2)).toLowerCase();
+            const durationP1 = getDurationString(reportData.apiParams.start1, reportData.apiParams.end1, true);
+            
+            const analysisUrl = `${window.location.href.split('?')[0]}?autorun=true&isCohort=${reportData.apiParams.isCohort}&start1=${reportData.apiParams.start1}&end1=${reportData.apiParams.end1}&start2=${reportData.apiParams.start2}&end2=${reportData.apiParams.end2}`;
+
+            summaryText = `Report Summary for ${durationP2} (${p2DateRange})
+(Auto-generated with Pika-RS)
 
 Date & Time Stamp of Generated Report: ${timestamp}
 
-• ${reportData.retentionRate}% of retailers who used Pika App in the prior period (${reportData.period1}) also used it in ${label}.
+- Retention: ${reportData.retentionRate}% of users from ${durationP1} were still active in ${durationP2}.
 
-• There were ${reportData.newUsers} new users in ${label}: New onboards + reactivated (i.e. people who did not use it in the first period but showed up in the second period).
+- New Users: ${reportData.newUsers} retailers were newly active. These are users who were present in ${durationP2} but not in ${durationP1}.
 
-• We've recorded ${reportData.churnedUsers} churned users from the prior period.
+- Churn: ${reportData.churnedUsers} users from ${durationP1} did not return. These users were active previously but were inactive during ${durationP2}.
 
-• And a total of ${reportData.totalActiveUsers} active users in ${label}.
+- Total Active Users: In total, there were ${reportData.totalActiveUsers} active users during ${durationP2}.
 
 Verification Link:
 ${analysisUrl}`;
+
         } else {
-            // Fallback to the more detailed "Example A" format
-            summaryText = `Report Summary for ${reportData.period2} (Auto-generated with Pika-RS.)
+            // Fallback for File Uploads
+            summaryText = `Report Summary: File 1 vs. File 2
+(Auto-generated with Pika-RS)
 
 Date & Time Stamp of Generated Report: ${timestamp}
 
-• ${reportData.retentionRate}% of retailers who used Pika App in the prior period (${reportData.period1}) also used it in ${reportData.period2}.
+- Retention: ${reportData.retentionRate}% of users from your first file (Period 1) were also present in your second file (Period 2).
 
-• There were ${reportData.newUsers} new users: New onboards + reactivated (i.e. people who did not use it in the first period but showed up in the second period).
+- New Users: ${reportData.newUsers} users were present in the second file but not in the first.
 
-• We've recorded ${reportData.churnedUsers} churned users from the prior period (${reportData.period1}).
+- Churn: ${reportData.churnedUsers} users from the first file were missing from the second file.
 
-• And a total of ${reportData.totalActiveUsers} active users for ${reportData.period2}.
-
-Verification Link:
-${analysisUrl}`;
+- Total Active Users: The second file contains a total of ${reportData.totalActiveUsers} users.`;
         }
-
-
-        // 3. Populate and show modal
+        
         reportContent.textContent = summaryText;
         reportModal.classList.remove('hidden');
         reportModalOverlay.classList.remove('hidden');
     };
-
 
     const hideReportModal = () => {
         reportModal.classList.add('hidden');
@@ -547,8 +537,6 @@ ${analysisUrl}`;
         });
     };
 
-
-    // --- RENDERING FUNCTIONS ---
     const createPopupTable = (popupId, title, data) => {
         const container = document.getElementById(popupId);
         container.innerHTML = '';
@@ -640,7 +628,7 @@ ${analysisUrl}`;
                     </thead>
                     <tbody>
                         ${data.map(row => `
-                        <tr>
+                        <tr data-phone-row="${row['Phone Number']}">
                             <td>${row['First Name']} ${row['Last Name']}</td>
                             <td>${row['Phone Number']}</td>
                             <td>${row['Store Name'] || 'N/A'}</td>
@@ -659,9 +647,17 @@ ${analysisUrl}`;
 
         const footer = document.createElement('div');
         footer.className = 'popup-footer';
-
+        
         const totalText = document.createElement('span');
         totalText.textContent = `Total: ${data.length} users.`;
+
+        const monitorTools = document.createElement('div');
+        monitorTools.className = 'monitor-tools hidden';
+        monitorTools.innerHTML = `
+            <label for="monitor-due-date" class="text-xs font-medium">Due Date:</label>
+            <input type="date" id="monitor-due-date" class="monitor-due-date-input">
+            <button id="create-monitor-btn" class="create-monitor-btn">Create live monitor</button>
+        `;
 
         const buttonsWrapper = document.createElement('div');
         buttonsWrapper.className = 'flex items-center gap-2';
@@ -701,10 +697,173 @@ ${analysisUrl}`;
         footer.appendChild(totalText);
         buttonsWrapper.appendChild(collapseBtn);
         buttonsWrapper.appendChild(copyButton);
+        buttonsWrapper.appendChild(monitorTools);
         footer.appendChild(buttonsWrapper);
 
         container.innerHTML = tableHTML;
         container.appendChild(footer);
+
+        const selects = container.querySelectorAll('.account-exec-select');
+        const updateMonitorToolsVisibility = () => {
+            const hasAssignment = Array.from(selects).some(select => select.value !== '');
+            if (hasAssignment) {
+                container.querySelector('.monitor-tools').classList.remove('hidden');
+            } else {
+                container.querySelector('.monitor-tools').classList.add('hidden');
+            }
+        };
+        selects.forEach(select => select.addEventListener('change', updateMonitorToolsVisibility));
+
+        container.querySelector('#create-monitor-btn').addEventListener('click', () => {
+            const dueDate = container.querySelector('#monitor-due-date').value;
+            if (!dueDate) {
+                alert('Please set a due date for the assignments.');
+                return;
+            }
+            const assignedUsers = [];
+            selects.forEach(select => {
+                if (select.value) {
+                    const userData = data.find(user => user['Phone Number'] === select.dataset.phone);
+                    assignedUsers.push({ ...userData, assignedAE: select.value });
+                }
+            });
+            generateMonitorPage(assignedUsers, dueDate);
+        });
+    };
+
+    // UPDATED: generateMonitorPage now includes all columns
+    const generateMonitorPage = (assignedUsers, dueDate) => {
+        const creationDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        const formattedDueDate = new Date(dueDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+        
+        const htmlContent = `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Churn Reactivation Live Monitor</title>
+    <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f8fafc; color: #334155; }
+        header { background-color: white; padding: 1.5rem; border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+        .header-content { display: flex; justify-content: space-between; align-items: center; }
+        .header-info { font-size: 0.9rem; color: #64748b; }
+        .refresh-btn { background-color: #2563eb; color: white; border: none; padding: 0.6rem 1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
+        .refresh-btn:hover { background-color: #1d4ed8; }
+        table { width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-radius: 0.75rem; overflow: hidden; font-size: 0.9rem; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        thead { background-color: #f1f5f9; }
+        th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
+        .status { font-weight: 700; padding: 0.25rem 0.5rem; border-radius: 999px; font-size: 0.8rem; text-align: center; }
+        .status-reactivated { color: #15803d; background-color: #dcfce7; }
+        .status-pending { color: #b45309; background-color: #fef3c7; }
+        tr.reactivated { background-color: #f0fdf4; }
+    </style>
+</head>
+<body>
+    <header>
+        <div class="header-content">
+            <div>
+                <h1 style="margin: 0;">Churn Reactivation Monitor</h1>
+                <p class="header-info" style="margin: 0.25rem 0 0 0;">Created on: <strong>${creationDate}</strong> | Due Date: <strong>${formattedDueDate}</strong></p>
+            </div>
+            <button id="refresh-btn" class="refresh-btn">Refresh Status</button>
+        </div>
+    </header>
+    <main>
+        <table>
+            <thead>
+                <tr>
+                    <th>Retailer Name</th>
+                    <th>Phone Number</th>
+                    <th>Store Name</th>
+                    <th>LGA</th>
+                    <th>Store Address</th>
+                    <th>Last Sale Date</th>
+                    <th>Assigned To</th>
+                    <th>Status</th>
+                </tr>
+            </thead>
+            <tbody id="monitor-table-body">
+                ${assignedUsers.map(user => `
+                <tr data-phone="${user['Phone Number']}">
+                    <td>${user['First Name']} ${user['Last Name']}</td>
+                    <td>${user['Phone Number']}</td>
+                    <td>${user['Store Name'] || 'N/A'}</td>
+                    <td>${user['LGA'] || 'N/A'}</td>
+                    <td>${user['Store Address'] || 'N/A'}</td>
+                    <td>${formatDate(user['Created Date'])}</td>
+                    <td>${user.assignedAE}</td>
+                    <td><span class="status status-pending">Pending</span></td>
+                </tr>`).join('')}
+            </tbody>
+        </table>
+    </main>
+    <script>
+        // NEW: Embedded helper function to format dates
+        function formatDate(dateString) {
+            if (!dateString) return 'N/A';
+            const date = new Date(dateString);
+            if (isNaN(date.getTime())) return dateString;
+            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        };
+
+        const assignedUsers = ${JSON.stringify(assignedUsers.map(u => u['Phone Number']))};
+        const dueDate = '${dueDate}';
+        const refreshBtn = document.getElementById('refresh-btn');
+
+        async function checkReactivationStatus() {
+            refreshBtn.textContent = 'Checking...';
+            refreshBtn.disabled = true;
+            
+            // This must be your LIVE Render URL
+            const API_ENDPOINT = 'https://pika-backend-monitor.onrender.com/api/v1/admin/analytics/activity-status';
+            
+            try {
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ phoneNumbers: assignedUsers, endDate: dueDate })
+                });
+
+                if (!response.ok) throw new Error('Network response was not ok');
+                
+                const data = await response.json();
+                const reactivatedPhones = new Set(data.reactivated_users || []);
+                
+                document.querySelectorAll('#monitor-table-body tr').forEach(row => {
+                    const phone = row.dataset.phone;
+                    if (reactivatedPhones.has(phone)) {
+                        row.classList.add('reactivated');
+                        const statusCell = row.querySelector('.status');
+                        statusCell.textContent = 'Reactivated';
+                        statusCell.className = 'status status-reactivated';
+                    }
+                });
+
+            } catch (error) {
+                console.error('Error fetching reactivation status:', error);
+                alert('Could not fetch reactivation status. Please check the console for errors.');
+            } finally {
+                refreshBtn.textContent = 'Refresh Status';
+                refreshBtn.disabled = false;
+            }
+        }
+        
+        refreshBtn.addEventListener('click', checkReactivationStatus);
+        
+        document.addEventListener('DOMContentLoaded', checkReactivationStatus);
+    <\/script>
+</body>
+</html>`;
+
+        const blob = new Blob([htmlContent], { type: 'text/html' });
+        const link = document.createElement('a');
+        link.href = URL.createObjectURL(blob);
+        link.download = `live-monitor_${new Date().toISOString().split('T')[0]}.html`;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     };
 
     const renderTable = (data) => {
@@ -747,15 +906,15 @@ ${analysisUrl}`;
     fileInput2.addEventListener('change', () => handleFileUpload(fileInput2.files[0], 2));
     fetchApiBtn.addEventListener('click', handleApiFetch);
 
-    // Report Modal Listeners
     reportInfoIcon.addEventListener('click', showReportModal);
     closeReportBtn.addEventListener('click', hideReportModal);
     reportModalOverlay.addEventListener('click', hideReportModal);
     copyReportBtn.addEventListener('click', copyReport);
 
     cohortToggle.addEventListener('change', () => {
-        cohortInputs.classList.toggle('hidden', !cohortToggle.checked);
-        churnInputs.classList.toggle('hidden', cohortToggle.checked);
+        const isChecked = cohortToggle.checked;
+        cohortInputs.classList.toggle('hidden', !isChecked);
+        churnInputs.classList.toggle('hidden', isChecked);
         resetDashboard();
     });
 
@@ -765,7 +924,6 @@ ${analysisUrl}`;
         container.addEventListener('drop', (e) => { e.preventDefault(); container.classList.remove('dragover'); if (!container.classList.contains('disabled')) { const files = e.dataTransfer.files; if (files.length) { const fileInput = index === 0 ? fileInput1 : fileInput2; fileInput.files = files; handleFileUpload(files[0], index + 1); } } });
     });
 
-    // Reset preset label if manual date is entered
     [apiStart1Input, apiEnd1Input, apiStart2Input, apiEnd2Input, apiStartChurnInput, apiEndChurnInput].forEach(input => {
         input.addEventListener('change', () => {
              period2Label = null;
@@ -856,7 +1014,6 @@ ${analysisUrl}`;
                 targetConfig.endInput.value = toYYYYMMDD(end);
                 updateDateDisplay(targetConfig.startInput, targetConfig.endInput, targetConfig.displayContainer);
 
-                // If this preset is for period 2, store its label for the report
                 if (targetConfig.isPeriod2) {
                     period2Label = preset.label;
                 }
@@ -871,12 +1028,11 @@ ${analysisUrl}`;
         ];
 
         targets.forEach(target => {
-            target.container.innerHTML = ''; // Clear existing
+            target.container.innerHTML = ''; 
             presets.forEach(p => target.container.appendChild(createButton(p, target)));
         });
     };
 
-    // --- Intuitive Scroll Hint Animation ---
     const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
 
     const triggerScrollHintAnimation = async () => {
@@ -886,31 +1042,28 @@ ${analysisUrl}`;
 
         if (scrollableWidth <= 0) return;
 
-        const scrollDuration = 500; // Time for one scroll movement in ms
-        const pauseDuration = 100;  // A short pause between movements
+        const scrollDuration = 500; 
+        const pauseDuration = 100;
 
         arrow.classList.add('is-visible');
-        await sleep(50); // let it fade in
+        await sleep(50); 
 
-        // --- Cycle 1 ---
-        arrow.classList.remove('flip'); // Point right
+        arrow.classList.remove('flip'); 
         container.scrollTo({ left: scrollableWidth, behavior: 'smooth' });
         await sleep(scrollDuration + pauseDuration);
 
-        arrow.classList.add('flip'); // Point left
+        arrow.classList.add('flip');
         container.scrollTo({ left: 0, behavior: 'smooth' });
         await sleep(scrollDuration + pauseDuration);
 
-        // --- Cycle 2 ---
-        arrow.classList.remove('flip'); // Point right
+        arrow.classList.remove('flip');
         container.scrollTo({ left: scrollableWidth, behavior: 'smooth' });
         await sleep(scrollDuration + pauseDuration);
 
-        arrow.classList.add('flip'); // Point left
+        arrow.classList.add('flip');
         container.scrollTo({ left: 0, behavior: 'smooth' });
         await sleep(scrollDuration + pauseDuration);
 
-        // Hide arrow
         arrow.classList.remove('is-visible');
     };
 
@@ -930,7 +1083,7 @@ ${analysisUrl}`;
 
         const isCohort = urlParams.get('isCohort') === 'true';
         cohortToggle.checked = isCohort;
-        cohortToggle.dispatchEvent(new Event('change')); // Trigger UI toggle
+        cohortToggle.dispatchEvent(new Event('change'));
 
         if (isCohort) {
             apiStart1Input.value = urlParams.get('start1') || '';
@@ -938,24 +1091,36 @@ ${analysisUrl}`;
             apiStart2Input.value = urlParams.get('start2') || '';
             apiEnd2Input.value = urlParams.get('end2') || '';
         } else {
-            apiStartChurnInput.value = urlParams.get('startChurn') || '';
-            apiEndChurnInput.value = urlParams.get('endChurn') || '';
+            const churnStart = urlParams.get('startChurn') || '';
+            const churnEnd = urlParams.get('endChurn') || '';
+            
+            if (isCohort === false && churnStart && churnEnd) {
+                 apiStartChurnInput.value = churnStart;
+                 apiEndChurnInput.value = churnEnd;
+            } else { 
+                apiStart1Input.value = urlParams.get('start1') || '';
+                apiEnd1Input.value = urlParams.get('end1') || '';
+                apiStart2Input.value = urlParams.get('start2') || '';
+                apiEnd2Input.value = urlParams.get('end2') || '';
+                cohortToggle.checked = true;
+                cohortToggle.dispatchEvent(new Event('change'));
+            }
         }
-
-        // Trigger change events on all inputs to update the visual date displays
+        
         [apiStart1Input, apiEnd1Input, apiStart2Input, apiEnd2Input, apiStartChurnInput, apiEndChurnInput].forEach(input => {
             if (input.value) input.dispatchEvent(new Event('change'));
         });
         
-        // When autorunning, we don't know the preset label, so we clear it.
         period2Label = null;
-
-        // Use a small timeout to ensure the UI has updated before fetching
+        
         setTimeout(() => {
             fetchApiBtn.click();
         }, 100);
     };
 
+    // Initial setup on page load
+    cohortInputs.classList.add('hidden');
+    churnInputs.classList.remove('hidden');
     initDatePresets();
-    autorunFromUrl(); // Check for autorun params on page load
+    autorunFromUrl();
 });

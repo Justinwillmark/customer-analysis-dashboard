@@ -26,33 +26,38 @@
 
         <header class="mb-8 text-center">
             <h1 class="text-4xl font-bold text-slate-900 main-title">Customer Retention & Analysis Dashboard</h1>
-            <p class="text-slate-500 mt-2 max-w-2xl mx-auto">Upload two transaction summaries to compare periods or use the API fetch for cohort and churn analysis.</p>
+            <p class="text-slate-500 mt-2 max-w-2xl mx-auto">Use the API fetch for cohort and churn analysis or upload files for comparison.</p>
         </header>
 
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-            <div id="upload-container-1" class="file-input-container rounded-lg p-6 text-center">
-                <input type="file" id="csv-file-1" class="hidden" accept=".csv">
-                <label for="csv-file-1" class="cursor-pointer">
-                    <div class="flex flex-col items-center justify-center space-y-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                        <p class="font-semibold text-slate-700">Upload Period 1 File</p>
-                        <p id="file-name-1" class="text-sm text-slate-500">Drag & drop or click to upload</p>
-                        <p id="date-range-1" class="text-sm font-semibold text-blue-600"></p>
+        <details class="file-upload-details bg-slate-50 rounded-xl border border-slate-200 mb-8">
+            <summary class="file-upload-summary">Upload CSV Files for Comparison</summary>
+            <div class="p-6">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div id="upload-container-1" class="file-input-container rounded-lg p-6 text-center">
+                        <input type="file" id="csv-file-1" class="hidden" accept=".csv">
+                        <label for="csv-file-1" class="cursor-pointer">
+                            <div class="flex flex-col items-center justify-center space-y-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                                <p class="font-semibold text-slate-700">Upload Period 1 File</p>
+                                <p id="file-name-1" class="text-sm text-slate-500">Drag & drop or click to upload</p>
+                                <p id="date-range-1" class="text-sm font-semibold text-blue-600"></p>
+                            </div>
+                        </label>
                     </div>
-                </label>
-            </div>
-            <div id="upload-container-2" class="file-input-container rounded-lg p-6 text-center disabled">
-                <input type="file" id="csv-file-2" class="hidden" accept=".csv" disabled>
-                <label for="csv-file-2" id="upload-label-2" class="cursor-not-allowed">
-                    <div class="flex flex-col items-center justify-center space-y-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                        <p class="font-semibold text-slate-700">Upload Period 2 File</p>
-                        <p id="file-name-2" class="text-sm text-slate-500">Upload Period 1 file first</p>
-                        <p id="date-range-2" class="text-sm font-semibold text-green-600"></p>
+                    <div id="upload-container-2" class="file-input-container rounded-lg p-6 text-center disabled">
+                        <input type="file" id="csv-file-2" class="hidden" accept=".csv" disabled>
+                        <label for="csv-file-2" id="upload-label-2" class="cursor-not-allowed">
+                            <div class="flex flex-col items-center justify-center space-y-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                                <p class="font-semibold text-slate-700">Upload Period 2 File</p>
+                                <p id="file-name-2" class="text-sm text-slate-500">Upload Period 1 file first</p>
+                                <p id="date-range-2" class="text-sm font-semibold text-green-600"></p>
+                            </div>
+                        </label>
                     </div>
-                </label>
+                </div>
             </div>
-        </div>
+        </details>
 
         <details class="api-details bg-slate-50 rounded-xl border border-slate-200 mb-8" open>
             <summary class="api-summary">Alternative: Fetch from API Endpoint</summary>
@@ -66,12 +71,12 @@
                     <div class="flex items-center justify-end gap-3">
                          <label for="cohort-toggle" class="text-sm font-medium text-slate-700">Use Cohort Comparison</label>
                          <label class="toggle-switch">
-                            <input type="checkbox" id="cohort-toggle" checked>
+                            <input type="checkbox" id="cohort-toggle">
                             <span class="slider"></span>
                         </label>
                     </div>
 
-                    <div id="cohort-inputs">
+                    <div id="cohort-inputs" class="hidden">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <div>
                                 <h4 class="text-sm font-medium text-slate-700 mb-2">Period 1 Date Range</h4>
@@ -96,9 +101,9 @@
                         </div>
                     </div>
 
-                    <div id="churn-inputs" class="hidden">
+                    <div id="churn-inputs">
                         <div>
-                             <h4 class="text-sm font-medium text-slate-700 mb-2">Any selected time period is compared with activity in the 30 days prior</h4>
+                             <h4 class="text-sm font-medium text-slate-700 mb-2">Select time period to compare with activity in the 30 days prior</h4>
                              <div class="flex items-center gap-2 mb-3" id="api-presets-churn"></div>
                              <div class="flex items-center gap-2">
                                 <input type="date" id="api-start-churn" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
