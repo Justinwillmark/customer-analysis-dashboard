@@ -7,6 +7,7 @@
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
+    <!-- pako.js is needed for creating the shareable monitor link -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,7 +16,30 @@
 </head>
 <body class="text-slate-800">
 
-    <div id="loading-overlay" class="fixed inset-0 bg-slate-900 bg-opacity-30 z-50 hidden items-center justify-center">
+    <!-- NEW: Login Screen Overlay -->
+    <div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center">
+        <div class="login-card">
+            <div class="login-icon">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
+                </svg>
+            </div>
+            <h2 class="text-2xl font-bold text-center text-slate-800">Access Dashboard</h2>
+            <p class="text-sm text-slate-500 text-center">Please enter the password to continue.</p>
+            <form id="login-form" class="mt-6 space-y-4">
+                <div>
+                    <label for="password-input" class="sr-only">Password</label>
+                    <input type="password" id="password-input" placeholder="Password" class="login-input">
+                </div>
+                <button type="submit" class="login-button">Unlock</button>
+            </form>
+            <p id="login-error" class="login-error-message"></p>
+        </div>
+    </div>
+
+
+    <!-- Loading Overlay -->
+    <div id="loading-overlay" class="fixed inset-0 bg-slate-900 bg-opacity-30 z-40 hidden items-center justify-center">
         <div class="loader-card">
             <div class="loader"></div>
             <p class="text-slate-600 font-medium">Fetching & Analyzing Data...</p>
@@ -23,7 +47,8 @@
     </div>
 
 
-    <div id="app" class="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto">
+    <!-- Main app content is now hidden by default -->
+    <div id="app" class="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto hidden">
 
         <header class="mb-8 text-center">
             <h1 class="text-4xl font-bold text-slate-900 main-title">Customer Retention & Analysis Dashboard</h1>
@@ -205,6 +230,7 @@
         </div>
     </div>
 
+    <!-- Report Summary Modal -->
     <div id="report-modal-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
     <div id="report-modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-50 w-full max-w-lg p-6 hidden">
         <h2 class="text-lg font-bold mb-4 text-slate-800">Report Summary</h2>

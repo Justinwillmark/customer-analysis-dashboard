@@ -1,12 +1,51 @@
 document.addEventListener('DOMContentLoaded', () => {
+    // --- NEW: LOGIN LOGIC ---
+    const app = document.getElementById('app');
+    const loginOverlay = document.getElementById('login-overlay');
+    const loginForm = document.getElementById('login-form');
+    const passwordInput = document.getElementById('password-input');
+    const loginError = document.getElementById('login-error');
+    const loginCard = document.querySelector('.login-card');
+
+    const handleLogin = (e) => {
+        if (e) e.preventDefault();
+        
+        loginError.textContent = '';
+        loginCard.classList.remove('shake');
+
+        if (passwordInput.value === 'daily') {
+            sessionStorage.setItem('isLoggedIn', 'true');
+            loginOverlay.style.opacity = '0';
+            loginOverlay.style.visibility = 'hidden';
+            app.classList.remove('hidden');
+        } else {
+            loginError.textContent = 'Incorrect password. Please try again.';
+            loginCard.classList.add('shake');
+            passwordInput.value = '';
+        }
+    };
+
+    const checkLogin = () => {
+        if (sessionStorage.getItem('isLoggedIn') === 'true') {
+            loginOverlay.classList.add('hidden');
+            app.classList.remove('hidden');
+        } else {
+            loginOverlay.classList.remove('hidden');
+            app.classList.add('hidden');
+        }
+    };
+
+    loginForm.addEventListener('submit', handleLogin);
+    checkLogin(); // Check login status on page load
+
     // --- STATE MANAGEMENT & CONSTANTS ---
     let dataPeriod1 = [];
     let dataPeriod2 = [];
-    let churnDataPeriod = []; // <-- Holds data from the new churn-specific endpoint
+    let churnDataPeriod = [];
     let filteredData = [];
     let dateRange1 = null;
     let dateRange2 = null;
-    let period2Label = null; // <-- To store the label from a preset button
+    let period2Label = null;
     let charts = {};
     let scrollHintCounter = 0;
     let reportData = {};

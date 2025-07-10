@@ -35,7 +35,7 @@ body {
     opacity: 0.6;
 }
 
-/* NEW: Styles for the collapsible file upload section */
+/* Styles for the collapsible file upload section */
 .file-upload-details > summary {
     list-style: none;
     padding: 1rem 1.5rem;
@@ -347,7 +347,7 @@ input:checked + .slider:before {
     background-color: #fff;
 }
 
-/* NEW: Styles for monitor creation tools */
+/* Styles for monitor creation tools */
 .monitor-tools {
     display: flex;
     align-items: center;
@@ -380,4 +380,77 @@ input:checked + .slider:before {
 
 body {
   zoom: 80%;
+}
+
+/* --- NEW: Login Screen Styles --- */
+#login-overlay {
+    background-color: #f1f5f9; /* slate-100 */
+    transition: opacity 0.5s ease-in-out, visibility 0.5s ease-in-out;
+}
+.login-card {
+    background-color: white;
+    padding: 2.5rem;
+    border-radius: 1.5rem;
+    box-shadow: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+    width: 100%;
+    max-width: 400px;
+    margin: 1rem;
+    display: flex;
+    flex-direction: column;
+    gap: 0.75rem;
+    transition: transform 0.3s;
+}
+.login-card.shake {
+    animation: shake 0.5s;
+}
+@keyframes shake {
+  10%, 90% { transform: translate3d(-1px, 0, 0); }
+  20%, 80% { transform: translate3d(2px, 0, 0); }
+  30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+  40%, 60% { transform: translate3d(4px, 0, 0); }
+}
+.login-icon {
+    margin: 0 auto;
+    background-color: #e0f2fe; /* sky-100 */
+    color: #0284c7; /* sky-600 */
+    border-radius: 50%;
+    width: 60px;
+    height: 60px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+.login-input {
+    width: 100%;
+    padding: 0.75rem 1rem;
+    border: 1px solid #cbd5e1; /* slate-300 */
+    border-radius: 0.5rem;
+    font-size: 1rem;
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+.login-input:focus {
+    outline: none;
+    border-color: #3b82f6; /* blue-500 */
+    box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+}
+.login-button {
+    width: 100%;
+    background-color: #1e293b; /* slate-800 */
+    color: white;
+    font-weight: 600;
+    padding: 0.75rem 1rem;
+    border-radius: 0.5rem;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.2s;
+}
+.login-button:hover {
+    background-color: #334155; /* slate-700 */
+}
+.login-error-message {
+    color: #dc2626; /* red-600 */
+    font-size: 0.875rem;
+    text-align: center;
+    font-weight: 500;
+    min-height: 1.25rem;
 }
