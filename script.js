@@ -177,6 +177,7 @@ document.addEventListener('DOMContentLoaded', () => {
         return `the ${diffDays}-day period`;
     };
 
+    // --- CORRECTED: resetDashboard now fully cleans up the UI state ---
     const resetDashboard = () => {
         dashboard.classList.add('hidden');
         hideStatus();
@@ -203,12 +204,13 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById(id).textContent = '';
         });
 
-
+        // Thoroughly reset all popups and fullscreen states
+        document.body.classList.remove('fullscreen-active');
         ['retained-popup', 'new-popup', 'churned-popup', 'total-popup'].forEach(id => {
             const popup = document.getElementById(id);
             if (popup) {
                 popup.innerHTML = '';
-                popup.classList.remove('expanded');
+                popup.classList.remove('expanded', 'fullscreen');
             }
         });
 
@@ -367,21 +369,18 @@ document.addEventListener('DOMContentLoaded', () => {
         const retentionEndpoint = baseUrl.replace('/churn', '/retention');
         const url1 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start1}&endDate=${end1}`;
         const url2 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start2}&endDate=${end2}`;
-        const churnUrl = `${retentionEndpoint}?download=churned-users&startDate=${start1}&endDate=${end1}`;
-
+        
         try {
-            const [response1, response2, churnResponse] = await Promise.all([fetch(url1), fetch(url2), fetch(churnUrl)]);
+            const [response1, response2] = await Promise.all([fetch(url1), fetch(url2)]);
 
             if (!response1.ok) throw new Error(`API error for Period 1: ${response1.status} ${response1.statusText}`);
             if (!response2.ok) throw new Error(`API error for Period 2: ${response2.status} ${response2.statusText}`);
-            if (!churnResponse.ok) throw new Error(`API error for Churn Data: ${churnResponse.status} ${churnResponse.statusText}`);
 
-            const [csvText1, csvText2, churnCsvText] = await Promise.all([response1.text(), response2.text(), churnResponse.text()]);
+            const [csvText1, csvText2] = await Promise.all([response1.text(), response2.text()]);
 
             await Promise.all([
                 parseAndProcessData(csvText1, 1),
-                parseAndProcessData(csvText2, 2),
-                parseAndProcessData(churnCsvText, 'churn')
+                parseAndProcessData(csvText2, 2)
             ]);
             analyzeData();
         } catch (error) {
@@ -402,65 +401,55 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const analyzeData = () => {
         showStatus('Analyzing data...');
-        hasShownScrollIndicator = false; 
-
+        
         const usersP1PhoneNumbers = new Set(dataPeriod1.map(u => u['Phone Number']));
         const usersP2PhoneNumbers = new Set(dataPeriod2.map(u => u['Phone Number']));
-
+        
         const retainedUsersSet = new Set([...usersP1PhoneNumbers].filter(phone => usersP2PhoneNumbers.has(phone)));
         const newUsersSet = new Set([...usersP2PhoneNumbers].filter(phone => !usersP1PhoneNumbers.has(phone)));
-
-        let relevantChurnData;
-        if (churnDataPeriod.length > 0) {
-             relevantChurnData = churnDataPeriod.filter(churnedUser =>
-                usersP1PhoneNumbers.has(churnedUser['Phone Number'])
-            );
-        } else {
-            const churnedPhoneNumbers = new Set([...usersP1PhoneNumbers].filter(phone => !usersP2PhoneNumbers.has(phone)));
-            relevantChurnData = dataPeriod1.filter(user => churnedPhoneNumbers.has(user['Phone Number']));
-        }
-
-        const churnedUsersCount = relevantChurnData.length;
+        const churnedPhoneNumbers = new Set([...usersP1PhoneNumbers].filter(phone => !usersP2PhoneNumbers.has(phone)));
+        
+        const retainedData = dataPeriod2.filter(u => retainedUsersSet.has(u['Phone Number']));
+        const newData = dataPeriod2.filter(u => newUsersSet.has(u['Phone Number']));
+        const churnedData = dataPeriod1.filter(user => churnedPhoneNumbers.has(user['Phone Number']));
+        
         const retentionRate = usersP1PhoneNumbers.size > 0 ? (retainedUsersSet.size / usersP1PhoneNumbers.size * 100).toFixed(1) : 0;
-
+        
         document.getElementById('retention-rate').textContent = `${retentionRate}%`;
         document.getElementById('retained-users').textContent = retainedUsersSet.size;
         document.getElementById('new-users').textContent = newUsersSet.size;
-        document.getElementById('churned-users').textContent = churnedUsersCount;
+        document.getElementById('churned-users').textContent = churnedData.length;
         document.getElementById('total-users').textContent = usersP2PhoneNumbers.size;
 
         const period1Text = formatPeriodText(dateRange1);
         const period2Text = formatPeriodText(dateRange2);
-
+        
         document.getElementById('retained-when').textContent = `from ${period2Text}`;
         document.getElementById('new-when').textContent = `from ${period2Text}`;
         document.getElementById('churned-when').textContent = `from ${period1Text}`;
         document.getElementById('total-when').textContent = `from ${period2Text}`;
 
-        const retainedData = dataPeriod2.filter(u => retainedUsersSet.has(u['Phone Number']));
-        const newData = dataPeriod2.filter(u => newUsersSet.has(u['Phone Number']));
-
         createPopupTable('retained-popup', 'Retained Users', retainedData);
         createPopupTable('new-popup', 'New Users', newData);
-        createPopupTable('churned-popup', 'Churned Users', relevantChurnData);
+        createPopupTable('churned-popup', 'Churned Users', churnedData);
         createPopupTable('total-popup', 'Total Active Users', dataPeriod2);
 
         tableTitle.textContent = `User Data for ${period2Text}`;
         tableDescription.textContent = `Showing ${dataPeriod2.length} total users in this period.`;
 
         renderCharts({ p1: { count: usersP1PhoneNumbers.size }, p2: { count: usersP2PhoneNumbers.size }, retained: retainedUsersSet.size });
-
+        
         const totalTransactionsP1 = dataPeriod1.reduce((sum, u) => sum + (u['Transaction Count'] || 0), 0);
         const totalTransactionsP2 = dataPeriod2.reduce((sum, u) => sum + (u['Transaction Count'] || 0), 0);
         const totalAmountP1 = dataPeriod1.reduce((sum, u) => sum + (u['Total Amount'] || 0), 0);
         const totalAmountP2 = dataPeriod2.reduce((sum, u) => sum + (u['Total Amount'] || 0), 0);
-
+        
         renderTransactionChart({ p1: { count: totalTransactionsP1, amount: totalAmountP1 }, p2: { count: totalTransactionsP2, amount: totalAmountP2 } });
 
         reportData = {
             retentionRate: retentionRate,
             newUsers: newUsersSet.size,
-            churnedUsers: churnedUsersCount,
+            churnedUsers: churnedData.length,
             totalActiveUsers: usersP2PhoneNumbers.size,
             period1Text: period1Text,
             period2Text: period2Text,
@@ -522,7 +511,6 @@ Verification Link:
 ${analysisUrl}`;
 
         } else {
-            // Fallback for File Uploads
             summaryText = `Report Summary: File 1 vs. File 2
 (Auto-generated with Pika-RS)
 
@@ -752,13 +740,27 @@ Date & Time Stamp of Generated Report: ${timestamp}
 
         const fullscreenBtn = container.querySelector('.fullscreen-toggle-btn');
         const searchInput = container.querySelector('#management-search');
+        
+        const freezeBodyScroll = () => document.body.classList.add('fullscreen-active');
+        const unfreezeBodyScroll = () => document.body.classList.remove('fullscreen-active');
+        
         fullscreenBtn.addEventListener('click', (e) => {
             e.stopPropagation();
-            container.classList.toggle('fullscreen');
-            document.body.classList.toggle('fullscreen-active');
+            const isNowFullscreen = container.classList.toggle('fullscreen');
+            
             container.querySelector('#maximize-icon').classList.toggle('hidden');
             container.querySelector('#minimize-icon').classList.toggle('hidden');
             searchInput.classList.toggle('hidden');
+
+            if (isNowFullscreen) {
+                freezeBodyScroll();
+                container.addEventListener('mouseenter', freezeBodyScroll);
+                container.addEventListener('mouseleave', unfreezeBodyScroll);
+            } else {
+                unfreezeBodyScroll();
+                container.removeEventListener('mouseenter', freezeBodyScroll);
+                container.removeEventListener('mouseleave', unfreezeBodyScroll);
+            }
         });
 
         searchInput.addEventListener('input', (e) => {

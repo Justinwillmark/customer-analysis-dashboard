@@ -291,7 +291,10 @@ input:checked + .slider:before {
     max-height: none;
     border-radius: 0;
     margin-top: 0;
-    z-index: 60; /* Higher than login overlay */
+    z-index: 60;
+    /* FIXED: Added flex properties to enable scrolling */
+    display: flex;
+    flex-direction: column;
 }
 
 .popup-table-container {
@@ -419,7 +422,7 @@ input:checked + .slider:before {
     background-color: #e2e8f0; /* slate-200 */
 }
 
-/* NEW: Styles for the management view search input */
+/* Styles for the management view search input */
 .management-search-input {
     border: 1px solid #cbd5e1;
     border-radius: 0.375rem;
