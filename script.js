@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // --- NEW: LOGIN LOGIC ---
+    // --- LOGIN LOGIC ---
     const app = document.getElementById('app');
     const loginOverlay = document.getElementById('login-overlay');
     const loginForm = document.getElementById('login-form');
@@ -36,7 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     loginForm.addEventListener('submit', handleLogin);
-    checkLogin(); // Check login status on page load
+    checkLogin();
 
     // --- STATE MANAGEMENT & CONSTANTS ---
     let dataPeriod1 = [];
@@ -51,7 +51,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let reportData = {};
     const accountExecutives = ['Chimezie Ezimoha', 'Waheed Ayinla', 'Abraham Ohworieha', 'Semilogo (for phone call)'];
 
-    // --- DOM ELEMENTS (File Upload) ---
+    // --- DOM ELEMENTS ---
     const uploadContainer1 = document.getElementById('upload-container-1');
     const uploadContainer2 = document.getElementById('upload-container-2');
     const fileInput1 = document.getElementById('csv-file-1');
@@ -61,12 +61,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const dateRangeEl1 = document.getElementById('date-range-1');
     const dateRangeEl2 = document.getElementById('date-range-2');
     const uploadLabel2 = document.getElementById('upload-label-2');
-
-    // --- DOM ELEMENTS (API Fetch) ---
     const apiUrlInput = document.getElementById('api-url');
     const fetchApiBtn = document.getElementById('fetch-api-data');
-
-    // Cohort Elements
     const cohortToggle = document.getElementById('cohort-toggle');
     const cohortInputs = document.getElementById('cohort-inputs');
     const apiStart1Input = document.getElementById('api-start-1');
@@ -75,20 +71,13 @@ document.addEventListener('DOMContentLoaded', () => {
     const apiEnd2Input = document.getElementById('api-end-2');
     const apiPresets1 = document.getElementById('api-presets-1');
     const apiPresets2 = document.getElementById('api-presets-2');
-
-    // Churn Elements
     const churnInputs = document.getElementById('churn-inputs');
     const apiStartChurnInput = document.getElementById('api-start-churn');
     const apiEndChurnInput = document.getElementById('api-end-churn');
     const apiPresetsChurn = document.getElementById('api-presets-churn');
-
-    // Visual Date Display Elements
     const dateDisplay1 = document.getElementById('date-display-1');
     const dateDisplay2 = document.getElementById('date-display-2');
     const dateDisplayChurn = document.getElementById('date-display-churn');
-
-
-    // --- GENERAL DOM ELEMENTS ---
     const dashboard = document.getElementById('dashboard');
     const statusContainer = document.getElementById('status-container');
     const statusMessage = document.getElementById('status-message');
@@ -103,8 +92,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const exportBtn = document.getElementById('export-csv');
     const noResultsEl = document.getElementById('no-results');
     const tableDescription = document.getElementById('table-description');
-
-    // --- REPORT MODAL ELEMENTS ---
     const reportInfoIcon = document.getElementById('report-info-icon');
     const reportModalOverlay = document.getElementById('report-modal-overlay');
     const reportModal = document.getElementById('report-modal');
@@ -650,39 +637,54 @@ Date & Time Stamp of Generated Report: ${timestamp}
 
         const executiveOptions = `<option value="">Assign...</option>` + accountExecutives.map(name => `<option value="${name}">${name}</option>`).join('');
 
-        const tableHTML = `
-            <div class="p-4 border-b border-slate-200"><h3 class="font-semibold text-slate-700">${title} - Management View</h3></div>
-            <div class="popup-table-container">
-                <table class="popup-table">
-                    <thead>
-                        <tr>
-                            <th>Name</th>
-                            <th>Phone</th>
-                            <th>Store Name</th>
-                            <th>LGA</th>
-                            <th>Store Address</th>
-                            <th style="min-width: 100px;">Last Sale Date</th>
-                            <th>Account Executive</th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        ${data.map(row => `
-                        <tr data-phone-row="${row['Phone Number']}">
-                            <td>${row['First Name']} ${row['Last Name']}</td>
-                            <td>${row['Phone Number']}</td>
-                            <td>${row['Store Name'] || 'N/A'}</td>
-                            <td>${row['LGA'] || 'N/A'}</td>
-                            <td>${row['Store Address'] || 'N/A'}</td>
-                            <td>${formatDate(row['Created Date'])}</td>
-                            <td>
-                                <select class="account-exec-select" data-phone="${row['Phone Number']}">
-                                    ${executiveOptions}
-                                </select>
-                            </td>
-                        </tr>`).join('')}
-                    </tbody>
-                </table>
-            </div>`;
+        const managementHeader = document.createElement('div');
+        managementHeader.className = 'management-header';
+        managementHeader.innerHTML = `
+            <h3 class="management-title">${title} - Management View</h3>
+            <input type="text" id="management-search" class="management-search-input hidden" placeholder="Search assigned users...">
+            <button class="fullscreen-toggle-btn" title="Toggle Fullscreen">
+                <svg id="maximize-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                </svg>
+                <svg id="minimize-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 hidden">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                </svg>
+            </button>
+        `;
+
+        const tableContainer = document.createElement('div');
+        tableContainer.className = 'popup-table-container';
+        tableContainer.innerHTML = `
+            <table class="popup-table">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Phone</th>
+                        <th>Store Name</th>
+                        <th>LGA</th>
+                        <th>Store Address</th>
+                        <th style="min-width: 100px;">Last Sale Date</th>
+                        <th>Account Executive</th>
+                    </tr>
+                </thead>
+                <tbody id="management-table-body">
+                    ${data.map(row => `
+                    <tr data-phone-row="${row['Phone Number']}">
+                        <td data-label="Name">${row['First Name']} ${row['Last Name']}</td>
+                        <td data-label="Phone">${row['Phone Number']}</td>
+                        <td data-label="Store Name">${row['Store Name'] || 'N/A'}</td>
+                        <td data-label="LGA">${row['LGA'] || 'N/A'}</td>
+                        <td data-label="Store Address">${row['Store Address'] || 'N/A'}</td>
+                        <td>${formatDate(row['Created Date'])}</td>
+                        <td>
+                            <select class="account-exec-select" data-phone="${row['Phone Number']}">
+                                ${executiveOptions}
+                            </select>
+                        </td>
+                    </tr>`).join('')}
+                </tbody>
+            </table>
+        `;
 
         const footer = document.createElement('div');
         footer.className = 'popup-footer';
@@ -706,6 +708,10 @@ Date & Time Stamp of Generated Report: ${timestamp}
         collapseBtn.className = 'popup-action-btn';
         collapseBtn.addEventListener('click', (e) => {
             e.stopPropagation();
+            if (container.classList.contains('fullscreen')) {
+                container.classList.remove('fullscreen');
+                document.body.classList.remove('fullscreen-active');
+            }
             createPopupTable('churned-popup', title, data);
         });
 
@@ -739,8 +745,38 @@ Date & Time Stamp of Generated Report: ${timestamp}
         buttonsWrapper.appendChild(monitorTools);
         footer.appendChild(buttonsWrapper);
 
-        container.innerHTML = tableHTML;
+        container.innerHTML = '';
+        container.appendChild(managementHeader);
+        container.appendChild(tableContainer);
         container.appendChild(footer);
+
+        const fullscreenBtn = container.querySelector('.fullscreen-toggle-btn');
+        const searchInput = container.querySelector('#management-search');
+        fullscreenBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            container.classList.toggle('fullscreen');
+            document.body.classList.toggle('fullscreen-active');
+            container.querySelector('#maximize-icon').classList.toggle('hidden');
+            container.querySelector('#minimize-icon').classList.toggle('hidden');
+            searchInput.classList.toggle('hidden');
+        });
+
+        searchInput.addEventListener('input', (e) => {
+            const searchTerm = e.target.value.toLowerCase();
+            const tableRows = container.querySelectorAll('#management-table-body tr');
+            tableRows.forEach(row => {
+                const name = row.querySelector('[data-label="Name"]').textContent.toLowerCase();
+                const phone = row.querySelector('[data-label="Phone"]').textContent.toLowerCase();
+                const store = row.querySelector('[data-label="Store Name"]').textContent.toLowerCase();
+                const lga = row.querySelector('[data-label="LGA"]').textContent.toLowerCase();
+
+                if (name.includes(searchTerm) || phone.includes(searchTerm) || store.includes(searchTerm) || lga.includes(searchTerm)) {
+                    row.style.display = '';
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+        });
 
         const selects = container.querySelectorAll('.account-exec-select');
         const updateMonitorToolsVisibility = () => {
