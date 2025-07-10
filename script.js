@@ -731,139 +731,27 @@ Date & Time Stamp of Generated Report: ${timestamp}
         });
     };
 
-    // UPDATED: generateMonitorPage now includes all columns
     const generateMonitorPage = (assignedUsers, dueDate) => {
-        const creationDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-        const formattedDueDate = new Date(dueDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-        
-        const htmlContent = `
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <title>Churn Reactivation Live Monitor</title>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f8fafc; color: #334155; }
-        header { background-color: white; padding: 1.5rem; border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
-        .header-content { display: flex; justify-content: space-between; align-items: center; }
-        .header-info { font-size: 0.9rem; color: #64748b; }
-        .refresh-btn { background-color: #2563eb; color: white; border: none; padding: 0.6rem 1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
-        .refresh-btn:hover { background-color: #1d4ed8; }
-        table { width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-radius: 0.75rem; overflow: hidden; font-size: 0.9rem; }
-        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
-        thead { background-color: #f1f5f9; }
-        th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
-        .status { font-weight: 700; padding: 0.25rem 0.5rem; border-radius: 999px; font-size: 0.8rem; text-align: center; }
-        .status-reactivated { color: #15803d; background-color: #dcfce7; }
-        .status-pending { color: #b45309; background-color: #fef3c7; }
-        tr.reactivated { background-color: #f0fdf4; }
-    </style>
-</head>
-<body>
-    <header>
-        <div class="header-content">
-            <div>
-                <h1 style="margin: 0;">Churn Reactivation Monitor</h1>
-                <p class="header-info" style="margin: 0.25rem 0 0 0;">Created on: <strong>${creationDate}</strong> | Due Date: <strong>${formattedDueDate}</strong></p>
-            </div>
-            <button id="refresh-btn" class="refresh-btn">Refresh Status</button>
-        </div>
-    </header>
-    <main>
-        <table>
-            <thead>
-                <tr>
-                    <th>Retailer Name</th>
-                    <th>Phone Number</th>
-                    <th>Store Name</th>
-                    <th>LGA</th>
-                    <th>Store Address</th>
-                    <th>Last Sale Date</th>
-                    <th>Assigned To</th>
-                    <th>Status</th>
-                </tr>
-            </thead>
-            <tbody id="monitor-table-body">
-                ${assignedUsers.map(user => `
-                <tr data-phone="${user['Phone Number']}">
-                    <td>${user['First Name']} ${user['Last Name']}</td>
-                    <td>${user['Phone Number']}</td>
-                    <td>${user['Store Name'] || 'N/A'}</td>
-                    <td>${user['LGA'] || 'N/A'}</td>
-                    <td>${user['Store Address'] || 'N/A'}</td>
-                    <td>${formatDate(user['Created Date'])}</td>
-                    <td>${user.assignedAE}</td>
-                    <td><span class="status status-pending">Pending</span></td>
-                </tr>`).join('')}
-            </tbody>
-        </table>
-    </main>
-    <script>
-        // NEW: Embedded helper function to format dates
-        function formatDate(dateString) {
-            if (!dateString) return 'N/A';
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return dateString;
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        };
+        try {
+            const monitorData = {
+                assignedUsers,
+                dueDate,
+                creationDate: new Date().toISOString()
+            };
 
-        const assignedUsers = ${JSON.stringify(assignedUsers.map(u => u['Phone Number']))};
-        const dueDate = '${dueDate}';
-        const refreshBtn = document.getElementById('refresh-btn');
+            const jsonString = JSON.stringify(monitorData);
+            const compressed = pako.deflate(jsonString);
+            const base64String = btoa(String.fromCharCode.apply(null, compressed));
 
-        async function checkReactivationStatus() {
-            refreshBtn.textContent = 'Checking...';
-            refreshBtn.disabled = true;
+            const url = new URL('monitor.html', window.location.href);
+            url.hash = base64String;
             
-            // This must be your LIVE Render URL
-            const API_ENDPOINT = 'https://pika-backend-monitor.onrender.com/api/v1/admin/analytics/activity-status';
-            
-            try {
-                const response = await fetch(API_ENDPOINT, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ phoneNumbers: assignedUsers, endDate: dueDate })
-                });
+            window.open(url.href, '_blank');
 
-                if (!response.ok) throw new Error('Network response was not ok');
-                
-                const data = await response.json();
-                const reactivatedPhones = new Set(data.reactivated_users || []);
-                
-                document.querySelectorAll('#monitor-table-body tr').forEach(row => {
-                    const phone = row.dataset.phone;
-                    if (reactivatedPhones.has(phone)) {
-                        row.classList.add('reactivated');
-                        const statusCell = row.querySelector('.status');
-                        statusCell.textContent = 'Reactivated';
-                        statusCell.className = 'status status-reactivated';
-                    }
-                });
-
-            } catch (error) {
-                console.error('Error fetching reactivation status:', error);
-                alert('Could not fetch reactivation status. Please check the console for errors.');
-            } finally {
-                refreshBtn.textContent = 'Refresh Status';
-                refreshBtn.disabled = false;
-            }
+        } catch (error) {
+            console.error('Error creating monitor link:', error);
+            alert('Could not create the monitor link. The user list may be too long.');
         }
-        
-        refreshBtn.addEventListener('click', checkReactivationStatus);
-        
-        document.addEventListener('DOMContentLoaded', checkReactivationStatus);
-    <\/script>
-</body>
-</html>`;
-
-        const blob = new Blob([htmlContent], { type: 'text/html' });
-        const link = document.createElement('a');
-        link.href = URL.createObjectURL(blob);
-        link.download = `live-monitor_${new Date().toISOString().split('T')[0]}.html`;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
     };
 
     const renderTable = (data) => {
