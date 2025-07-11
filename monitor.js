@@ -10,6 +10,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const refreshBtnText = document.getElementById('refresh-btn-text');
     const refreshIcon = document.getElementById('refresh-icon');
     const loadingSpinner = document.getElementById('loading-spinner');
+    const searchInput = document.getElementById('search-monitor-input');
     const noResults = document.getElementById('no-results');
 
     // State
@@ -86,13 +87,20 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const renderTable = () => {
+    const renderTable = (usersToRender) => {
         monitorTable.innerHTML = '';
-        if (assignedUsers.length === 0) {
-            monitorTable.innerHTML = '<tr><td colspan="9" class="px-6 py-4 text-center text-gray-500">No assigned users.</td></tr>';
+        noResults.classList.add('hidden');
+
+        if (usersToRender.length === 0) {
+            if (searchInput.value) { // Check if the emptiness is due to a search
+                noResults.classList.remove('hidden');
+            } else {
+                monitorTable.innerHTML = '<tr><td colspan="9" class="px-6 py-8 text-center text-gray-500">No assigned users.</td></tr>';
+            }
             return;
         }
-        assignedUsers.forEach((user, index) => {
+
+        usersToRender.forEach((user, index) => {
             const tr = document.createElement('tr');
             tr.className = 'transition-colors duration-500';
 
@@ -119,6 +127,24 @@ document.addEventListener('DOMContentLoaded', () => {
             monitorTable.appendChild(tr);
         });
         updateReactivatedCount();
+    };
+
+    const handleSearch = () => {
+        const searchTerm = searchInput.value.toLowerCase();
+        const filteredUsers = assignedUsers.filter(user => {
+            const fullName = `${user['First Name']} ${user['Last Name']}`.toLowerCase();
+            const phone = (user['Phone Number'] || '').toLowerCase();
+            const storeName = (user['Store Name'] || '').toLowerCase();
+            const lga = (user['LGA'] || '').toLowerCase();
+            const ae = (user.assignedAE || '').toLowerCase();
+
+            return fullName.includes(searchTerm) ||
+                   phone.includes(searchTerm) ||
+                   storeName.includes(searchTerm) ||
+                   lga.includes(searchTerm) ||
+                   ae.includes(searchTerm);
+        });
+        renderTable(filteredUsers);
     };
 
     const updateReactivatedCount = () => {
@@ -164,7 +190,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 user.status = activePhoneNumbers.has(user['Phone Number']) ? 'Reactivated' : 'Churned';
             });
 
-            renderTable();
+            handleSearch(); // Re-render table with search term applied
         } catch (error) {
             console.error('Error refreshing statuses:', error);
             alert(`Failed to refresh statuses: ${error.message}`);
@@ -180,13 +206,14 @@ document.addEventListener('DOMContentLoaded', () => {
     if (decodeMonitorData()) {
         updateMonitorInfo();
         updateTimeRemaining();
-        renderTable();
+        renderTable(assignedUsers);
 
         // Refresh statuses on load
         refreshStatuses();
 
         // Event Listeners
         refreshBtn.addEventListener('click', refreshStatuses);
+        searchInput.addEventListener('input', handleSearch);
 
         // Update time remaining every minute
         setInterval(updateTimeRemaining, 60000);
