@@ -814,12 +814,19 @@ Date & Time Stamp of Generated Report: ${timestamp}
     };
 
     const generateMonitorPage = (assignedUsers, dueDate) => {
+        if (!dateRange2 || !dateRange2.end || dateRange2.end === 'Data') {
+            alert('Monitor creation is only available when using API fetch with valid date ranges.');
+            return;
+        }
         try {
             const monitorData = {
                 assignedUsers,
                 dueDate,
                 creationDate: new Date().toISOString(),
-                churnPeriod: dateRange1
+                reactivationStartDate: dateRange2.end,
+                dateRange1: dateRange1,
+                dateRange2: dateRange2,
+                apiBaseUrl: apiUrlInput.value.trim()
             };
 
             const jsonString = JSON.stringify(monitorData);
@@ -905,7 +912,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
     [apiStart2Input, apiEnd2Input].forEach(input => input.addEventListener('change', () => updateDateDisplay(apiStart2Input, apiEnd2Input, dateDisplay2)));
     [apiStartChurnInput, apiEndChurnInput].forEach(input => input.addEventListener('change', () => updateDateDisplay(apiStartChurnInput, apiEndChurnInput, dateDisplayChurn)));
 
-
     const applyFilters = () => {
         const min = parseInt(minTransInput.value, 10);
         const max = parseInt(maxTransInput.value, 10);
@@ -937,7 +943,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
     minTransInput.addEventListener('input', applyFilters);
     maxTransInput.addEventListener('input', applyFilters);
     searchInput.addEventListener('input', applyFilters);
-
 
     exportBtn.addEventListener('click', () => {
         if (filteredData.length === 0) { alert('No data to export.'); return; }

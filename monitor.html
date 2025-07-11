@@ -2,282 +2,90 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>Pika Churn Reactivation Live Monitor</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pika Churn Reactivation Monitor</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.0.4/pako.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <style>
-        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; margin: 0; background-color: #f8fafc; color: #334155; zoom: 85%; }
-        header { background-color: white; padding: 1.5rem; border-bottom: 1px solid #e2e8f0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
-        main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
-        .header-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
-        .header-info { font-size: 0.9rem; color: #64748b; }
-        .churn-period-subtext { font-size: 0.9rem; color: #e11d48; font-weight: 500; }
-        .controls { display: flex; align-items: center; gap: 1rem; }
-        .search-box {
-            padding: 0.5rem 0.75rem;
-            border: 1px solid #d1d5db;
-            border-radius: 0.5rem;
-            font-size: 0.9rem;
-            width: 250px;
-            transition: border-color 0.2s, box-shadow 0.2s;
-        }
-        .search-box:focus {
-            outline: none;
-            border-color: #2563eb;
-            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
-        }
-        .refresh-btn { background-color: #2563eb; color: white; border: none; padding: 0.6rem 1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
-        .refresh-btn:hover { background-color: #1d4ed8; }
-        .refresh-btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
-        table { width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-radius: 0.75rem; overflow: hidden; font-size: 0.9rem; table-layout: fixed; }
-        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #e2e8f0; word-wrap: break-word; }
-        thead { background-color: #f1f5f9; }
-        th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
-        .col-number { width: 4%; }
-        .col-name { width: 15%; }
-        .col-phone { width: 10%; }
-        .col-last-sale { width: 10%; }
-        .col-store-name { width: 14%; }
-        .col-lga { width: 10%; }
-        .col-address { width: 15%; }
-        .col-assigned { width: 12%; }
-        .col-status { width: 10%; text-align: center; }
-        .status { font-weight: 700; padding: 0.25rem 0.5rem; border-radius: 999px; font-size: 0.8rem; text-align: center; }
-        .status-reactivated { color: #15803d; background-color: #dcfce7; }
-        .status-pending { color: #b45309; background-color: #fef3c7; }
-        tr.reactivated { background-color: #f0fdf4 !important; }
-        tbody tr:nth-child(even) { background-color: #f8fafc; }
-        #loader, #no-results { text-align: center; padding: 4rem; font-weight: 600; color: #64748b; }
-
-        #summary-card {
-            background: linear-gradient(135deg, #4f46e5, #7c3aed);
-            color: white;
-            padding: 1.5rem;
-            border-radius: 1rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.3), 0 8px 10px -6px rgba(79, 70, 229, 0.1);
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-        .summary-stat h3 {
-            font-size: 1rem;
-            font-weight: 500;
-            opacity: 0.8;
-            margin: 0;
-        }
-        .summary-stat p {
-            font-size: 2.25rem;
-            font-weight: 700;
-            margin: 0;
-            line-height: 1.2;
-        }
-        .summary-countdown {
-            text-align: right;
-        }
-    </style>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 </head>
-<body>
-    <header>
-        <div class="header-content">
+<body class="bg-gray-100 font-sans">
+    <div class="container mx-auto p-4 sm:p-6 lg:p-8">
+
+        <div class="monitor-header">
             <div>
-                <h1 style="margin: 0;">Pika Churn Reactivation Monitor</h1>
-                <p id="churn-period-subtext" class="churn-period-subtext"></p>
-                <p class="header-info" style="margin: 0.25rem 0 0 0;">Monitor created on: <strong id="creation-date">...</strong> | Due Date: <strong id="due-date">...</strong></p>
+                <h1 class="text-2xl lg:text-3xl font-bold text-gray-800">Churn Reactivation Monitor</h1>
+                <p id="monitor-info" class="text-sm text-gray-600 mt-1">
+                    Monitor created on: ... | Due Date: ...
+                </p>
+                <p id="churn-period-info" class="text-sm font-medium text-gray-500 mt-1">
+                    </p>
             </div>
-            <div class="controls">
-                <input type="text" id="search-box" class="search-box" placeholder="Search by name, phone, store...">
-                <button id="refresh-btn" class="refresh-btn">Refresh Status</button>
-            </div>
-        </div>
-    </header>
-    <main>
-        <div id="summary-card">
-            <div class="summary-stat">
-                <h3>Users Reactivated</h3>
-                <p id="reactivation-count">--/--</p>
-            </div>
-            <div class="summary-countdown summary-stat">
-                <h3>Time Remaining</h3>
-                <p id="days-remaining">--</p>
-            </div>
+            <button id="refresh-btn" class="refresh-button">
+                <svg id="refresh-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h5M20 20v-5h-5M20 4h-5l-1-1h-4l-1 1H5M4 20h5l1 1h4l1-1h5" />
+                </svg>
+                <svg id="loading-spinner" class="animate-spin h-5 w-5 mr-2 hidden" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <span id="refresh-btn-text">Refresh Status</span>
+            </button>
         </div>
 
-        <table>
-            <thead>
-                <tr>
-                    <th class="col-number">#</th>
-                    <th class="col-name">Retailer Name</th>
-                    <th class="col-phone">Phone Number</th>
-                    <th class="col-last-sale">Last Sale Date</th>
-                    <th class="col-store-name">Store Name</th>
-                    <th class="col-lga">LGA</th>
-                    <th class="col-address">Store Address</th>
-                    <th class="col-assigned">Assigned To</th>
-                    <th class="col-status">Status</th>
-                </tr>
-            </thead>
-            <tbody id="monitor-table-body">
-                </tbody>
-        </table>
-        <div id="loader">Loading assigned user data...</div>
-        <div id="no-results" style="display: none;">No users match your search.</div>
-    </main>
-    <script>
-        function formatDate(dateString) {
-            if (!dateString) return 'N/A';
-            const date = new Date(dateString);
-            if (isNaN(date.getTime())) return dateString;
-            return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-        }
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+            <div class="stat-card">
+                <div class="flex items-center">
+                    <div class="stat-icon bg-green-100 text-green-600">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
+                    </div>
+                    <h2 class="text-lg font-semibold text-gray-700 ml-3">Users Reactivated</h2>
+                </div>
+                <p id="reactivated-count" class="text-3xl font-bold text-gray-800 mt-2">--/--</p>
+                <div class="progress-bar-container">
+                    <div id="reactivated-progress" class="progress-bar"></div>
+                </div>
+            </div>
+            <div class="stat-card">
+                <div class="flex items-center">
+                    <div class="stat-icon bg-blue-100 text-blue-600">
+                         <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    </div>
+                    <h2 class="text-lg font-semibold text-gray-700 ml-3">Time Remaining</h2>
+                </div>
+                <p id="time-remaining" class="text-3xl font-bold text-gray-700 mt-2">--</p>
+                 <p class="text-sm text-gray-400 mt-1">until due date</p>
+            </div>
+        </div>
 
-        function toYYYYMMDD(d) {
-            return d.toISOString().split('T')[0];
-        }
-
-        function formatPeriodText(range) {
-            if (!range || !range.start) return 'N/A';
-            const startDate = new Date(range.start + 'T00:00:00');
-            const endDate = new Date(range.end + 'T00:00:00');
-            const startYear = startDate.getFullYear();
-            const endYear = endDate.getFullYear();
-
-            if (startYear !== endYear) {
-                return `Churned between ${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
-            } else {
-                return `Churned between ${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
-            }
-        }
-
-        function updateSummary(totalUsers, reactivatedCount, dueDate) {
-            document.getElementById('reactivation-count').textContent = `${reactivatedCount}/${totalUsers}`;
-            
-            const today = new Date();
-            today.setHours(0, 0, 0, 0);
-            const due = new Date(dueDate + 'T00:00:00');
-            const diffTime = due - today;
-            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-
-            const daysRemainingEl = document.getElementById('days-remaining');
-            if (diffDays < 0) {
-                daysRemainingEl.textContent = 'Past Due';
-            } else if (diffDays === 0) {
-                daysRemainingEl.textContent = 'Today';
-            } else {
-                daysRemainingEl.textContent = `${diffDays} Day${diffDays !== 1 ? 's' : ''}`;
-            }
-        }
-
-        async function checkReactivationStatus(monitorCreationDate, totalUsers, dueDate) {
-            const refreshBtn = document.getElementById('refresh-btn');
-            refreshBtn.textContent = 'Checking...';
-            refreshBtn.disabled = true;
-
-            const startDate = toYYYYMMDD(new Date(monitorCreationDate));
-            const endDate = toYYYYMMDD(new Date());
-
-            const API_ENDPOINT = `https://pika-inventory-94729b833f18.herokuapp.com/api/v1/admin/analytics/retention?download=retained-user-stats&startDate=${startDate}&endDate=${endDate}`;
-
-            try {
-                const response = await fetch(API_ENDPOINT);
-                if (!response.ok) throw new Error(`Network response was not ok (${response.status})`);
-                
-                const csvText = await response.text();
-                const parseResult = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-                if (parseResult.errors.length > 0) throw new Error("Error parsing CSV data from the API.");
-
-                const activePhoneNumbers = new Set(parseResult.data.map(user => user['Phone Number']));
-                let reactivatedCount = 0;
-
-                document.querySelectorAll('#monitor-table-body tr').forEach(row => {
-                    if (activePhoneNumbers.has(row.dataset.phone)) {
-                        row.classList.add('reactivated');
-                        const statusCell = row.querySelector('.status');
-                        statusCell.textContent = 'Reactivated';
-                        statusCell.className = 'status status-reactivated';
-                        reactivatedCount++;
-                    }
-                });
-                
-                updateSummary(totalUsers, reactivatedCount, dueDate);
-
-            } catch (error) {
-                console.error('Error fetching reactivation status:', error);
-                alert('Could not fetch reactivation status. Please check the console for errors.');
-            } finally {
-                refreshBtn.textContent = 'Refresh Status';
-                refreshBtn.disabled = false;
-            }
-        }
-
-        function filterTable() {
-            const searchTerm = document.getElementById('search-box').value.toLowerCase();
-            const tableRows = document.querySelectorAll('#monitor-table-body tr');
-            let visibleCount = 0;
-
-            tableRows.forEach(row => {
-                const rowText = row.textContent.toLowerCase();
-                if (rowText.includes(searchTerm)) {
-                    row.style.display = '';
-                    visibleCount++;
-                } else {
-                    row.style.display = 'none';
-                }
-            });
-
-            document.getElementById('no-results').style.display = visibleCount === 0 ? 'block' : 'none';
-        }
-
-        document.addEventListener('DOMContentLoaded', () => {
-            const loader = document.getElementById('loader');
-            const tableBody = document.getElementById('monitor-table-body');
-            
-            try {
-                const encodedData = window.location.hash.substring(1);
-                if (!encodedData) {
-                    loader.textContent = 'Error: No data found in the URL.';
-                    return;
-                }
-                const compressed = atob(encodedData);
-                const compressedArray = Uint8Array.from(compressed, c => c.charCodeAt(0));
-                const decompressed = pako.inflate(compressedArray, { to: 'string' });
-                const monitorData = JSON.parse(decompressed);
-
-                const { assignedUsers, dueDate, creationDate, churnPeriod } = monitorData;
-
-                document.getElementById('creation-date').textContent = new Date(creationDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-                document.getElementById('due-date').textContent = new Date(dueDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-                document.getElementById('churn-period-subtext').textContent = formatPeriodText(churnPeriod);
-
-
-                const rowsHtml = assignedUsers.map((user, index) => `
-                <tr data-phone="${user['Phone Number']}">
-                    <td>${index + 1}</td>
-                    <td>${user['First Name']} ${user['Last Name']}</td>
-                    <td>${user['Phone Number']}</td>
-                    <td>${formatDate(user['Created Date'])}</td>
-                    <td>${user['Store Name'] || 'N/A'}</td>
-                    <td>${user['LGA'] || 'N/A'}</td>
-                    <td>${user['Store Address'] || 'N/A'}</td>
-                    <td>${user.assignedAE}</td>
-                    <td class="col-status"><span class="status status-pending">Pending</span></td>
-                </tr>`).join('');
-                tableBody.innerHTML = rowsHtml;
-                loader.style.display = 'none';
-                
-                const totalUsers = assignedUsers.length;
-                updateSummary(totalUsers, 0, dueDate);
-
-                document.getElementById('refresh-btn').addEventListener('click', () => checkReactivationStatus(creationDate, totalUsers, dueDate));
-                document.getElementById('search-box').addEventListener('input', filterTable);
-                
-                checkReactivationStatus(creationDate, totalUsers, dueDate);
-
-            } catch (error) {
-                console.error('Failed to decode or render monitor data:', error);
-                loader.textContent = 'Error: Could not load data from URL. The link may be corrupted.';
-            }
-        });
-    </script>
+        <div class="bg-white shadow-lg rounded-lg overflow-hidden">
+            <div class="overflow-x-auto">
+                <table class="w-full text-left">
+                    <thead class="bg-gray-50 border-b border-gray-200">
+                        <tr>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">#</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Retailer Name</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Phone Number</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Last Sale Date</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Store Name</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">LGA</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Store Address</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider">Assigned To</th>
+                            <th class="px-6 py-3 text-xs font-bold text-gray-600 uppercase tracking-wider text-center">Status</th>
+                        </tr>
+                    </thead>
+                    <tbody id="monitor-table" class="divide-y divide-gray-200">
+                        <tr>
+                            <td colspan="9" class="px-6 py-8 text-center text-gray-500">Loading assigned user data...</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+    <script src="monitor.js"></script>
 </body>
 </html>
