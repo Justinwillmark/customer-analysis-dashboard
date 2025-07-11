@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- STATE MANAGEMENT & CONSTANTS ---
     let dataPeriod1 = [];
     let dataPeriod2 = [];
-    let churnDataPeriod = [];
+    let churnUserDetails = []; // This will hold the detailed data for churned users
     let filteredData = [];
     let dateRange1 = null;
     let dateRange2 = null;
@@ -177,14 +177,13 @@ document.addEventListener('DOMContentLoaded', () => {
         return `the ${diffDays}-day period`;
     };
 
-    // --- CORRECTED: resetDashboard now fully cleans up the UI state ---
     const resetDashboard = () => {
         dashboard.classList.add('hidden');
         hideStatus();
 
         dataPeriod1 = [];
         dataPeriod2 = [];
-        churnDataPeriod = [];
+        churnUserDetails = [];
         filteredData = [];
         dateRange1 = null;
         dateRange2 = null;
@@ -204,7 +203,6 @@ document.addEventListener('DOMContentLoaded', () => {
             document.getElementById(id).textContent = '';
         });
 
-        // Thoroughly reset all popups and fullscreen states
         document.body.classList.remove('fullscreen-active');
         ['retained-popup', 'new-popup', 'churned-popup', 'total-popup'].forEach(id => {
             const popup = document.getElementById(id);
@@ -272,17 +270,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 header: true,
                 skipEmptyLines: true,
                 complete: (results) => {
-                    const requiredColumns = ['First Name', 'Last Name', 'Phone Number', 'Transaction Count', 'Total Amount'];
-                    let missingColumns = [];
-
-                    if (period !== 'churn') {
-                        missingColumns = requiredColumns.filter(col => !results.meta.fields.includes(col));
-                    }
-
-                    if (missingColumns.length > 0) {
-                        return reject(new Error(`Missing required columns in data: ${missingColumns.join(', ')}`));
-                    }
-
                     const parsedData = results.data.map(row => ({
                         ...row,
                         'Transaction Count': parseInt(row['Transaction Count'], 10) || 0,
@@ -291,7 +278,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                     if (period === 1) dataPeriod1 = parsedData;
                     else if (period === 2) dataPeriod2 = parsedData;
-                    else if (period === 'churn') churnDataPeriod = parsedData;
+                    else if (period === 'churn') churnUserDetails = parsedData;
 
                     resolve();
                 },
@@ -323,6 +310,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     dateRange2 = dateRange;
                     fileName2.textContent = file.name;
                     dateRangeEl2.textContent = '';
+                    churnUserDetails = dataPeriod1; 
                     analyzeData();
                 }
             } catch (error) {
@@ -356,7 +344,8 @@ document.addEventListener('DOMContentLoaded', () => {
             const period1EndDate = new Date(period2StartDate);
             period1EndDate.setDate(period1EndDate.getDate() - 1);
             const period1StartDate = new Date(period1EndDate);
-            period1StartDate.setDate(period1StartDate.getDate() - 29);
+            const daysDifference = (new Date(churnEnd) - new Date(churnStart)) / (1000 * 3600 * 24);
+            period1StartDate.setDate(period1EndDate.getDate() - daysDifference);
             start1 = toYYYYMMDD(period1StartDate);
             end1 = toYYYYMMDD(period1EndDate);
         }
@@ -369,18 +358,21 @@ document.addEventListener('DOMContentLoaded', () => {
         const retentionEndpoint = baseUrl.replace('/churn', '/retention');
         const url1 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start1}&endDate=${end1}`;
         const url2 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start2}&endDate=${end2}`;
+        const churnUrl = `${retentionEndpoint}?download=churned-users&startDate=${start1}&endDate=${end1}`;
         
         try {
-            const [response1, response2] = await Promise.all([fetch(url1), fetch(url2)]);
+            const [response1, response2, churnResponse] = await Promise.all([fetch(url1), fetch(url2), fetch(churnUrl)]);
 
             if (!response1.ok) throw new Error(`API error for Period 1: ${response1.status} ${response1.statusText}`);
             if (!response2.ok) throw new Error(`API error for Period 2: ${response2.status} ${response2.statusText}`);
+            if (!churnResponse.ok) throw new Error(`API error for Churn Data: ${churnResponse.status} ${churnResponse.statusText}`);
 
-            const [csvText1, csvText2] = await Promise.all([response1.text(), response2.text()]);
+            const [csvText1, csvText2, churnCsvText] = await Promise.all([response1.text(), response2.text(), churnResponse.text()]);
 
             await Promise.all([
                 parseAndProcessData(csvText1, 1),
-                parseAndProcessData(csvText2, 2)
+                parseAndProcessData(csvText2, 2),
+                parseAndProcessData(churnCsvText, 'churn')
             ]);
             analyzeData();
         } catch (error) {
@@ -411,14 +403,32 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const retainedData = dataPeriod2.filter(u => retainedUsersSet.has(u['Phone Number']));
         const newData = dataPeriod2.filter(u => newUsersSet.has(u['Phone Number']));
-        const churnedData = dataPeriod1.filter(user => churnedPhoneNumbers.has(user['Phone Number']));
         
+        // --- THE ACCURATE FIX ---
+        // 1. Create a map of the detailed churn user data for easy lookup.
+        const churnDetailsMap = new Map(churnUserDetails.map(u => [u['Phone Number'], u]));
+        
+        // 2. The definitive list of churned users comes from Period 1 data, filtered by the accurate churned phone numbers set.
+        const churnedData = dataPeriod1
+            .filter(user => churnedPhoneNumbers.has(user['Phone Number']))
+            .map(user => {
+                // 3. Enrich this definitive list with details (like Created Date) from the churn-specific API call.
+                const details = churnDetailsMap.get(user['Phone Number']);
+                return {
+                    ...user, // This provides the correct Transaction Count from Period 1
+                    'Created Date': details ? details['Created Date'] : user['Created Date'], // Use the detailed date if available
+                    'Store Name': details ? details['Store Name'] : user['Store Name'],
+                    'Store Address': details ? details['Store Address'] : user['Store Address'],
+                    'LGA': details ? details['LGA'] : user['LGA']
+                };
+            });
+
         const retentionRate = usersP1PhoneNumbers.size > 0 ? (retainedUsersSet.size / usersP1PhoneNumbers.size * 100).toFixed(1) : 0;
         
         document.getElementById('retention-rate').textContent = `${retentionRate}%`;
         document.getElementById('retained-users').textContent = retainedUsersSet.size;
         document.getElementById('new-users').textContent = newUsersSet.size;
-        document.getElementById('churned-users').textContent = churnedData.length;
+        document.getElementById('churned-users').textContent = churnedPhoneNumbers.size; // This count is now guaranteed to match the list.
         document.getElementById('total-users').textContent = usersP2PhoneNumbers.size;
 
         const period1Text = formatPeriodText(dateRange1);
@@ -431,7 +441,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         createPopupTable('retained-popup', 'Retained Users', retainedData);
         createPopupTable('new-popup', 'New Users', newData);
-        createPopupTable('churned-popup', 'Churned Users', churnedData);
+        createPopupTable('churned-popup', 'Churned Users', churnedData); // This now uses the accurate, enriched list.
         createPopupTable('total-popup', 'Total Active Users', dataPeriod2);
 
         tableTitle.textContent = `User Data for ${period2Text}`;
@@ -449,12 +459,12 @@ document.addEventListener('DOMContentLoaded', () => {
         reportData = {
             retentionRate: retentionRate,
             newUsers: newUsersSet.size,
-            churnedUsers: churnedData.length,
+            churnedUsers: churnedPhoneNumbers.size,
             totalActiveUsers: usersP2PhoneNumbers.size,
             period1Text: period1Text,
             period2Text: period2Text,
             periodLabel: period2Label,
-            isApiMode: !fileInput1.files[0],
+            isApiMode: !fileInput1.files[0] && !fileInput2.files[0],
             apiParams: {
                 start1: dateRange1 ? dateRange1.start : null,
                 end1: dateRange1 ? dateRange1.end : null,
@@ -564,7 +574,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
             <div class="popup-table-container">
                 <table class="popup-table">
                     <thead><tr><th>Name</th><th>Transactions</th><th>Phone</th></tr></thead>
-                    <tbody>${data.slice(0, 10).map(row => `<tr><td>${row['First Name']} ${row['Last Name']}</td><td style="text-align: center;">${row['Transaction Count'] || 'N/A'}</td><td>${row['Phone Number']}</td></tr>`).join('')}</tbody>
+                    <tbody>${data.slice(0, 10).map(row => `<tr><td>${row['First Name']} ${row['Last Name']}</td><td style="text-align: center;">${row['Transaction Count'] !== undefined ? row['Transaction Count'] : 'N/A'}</td><td>${row['Phone Number']}</td></tr>`).join('')}</tbody>
                 </table>
             </div>`;
 
@@ -581,10 +591,10 @@ Date & Time Stamp of Generated Report: ${timestamp}
             e.stopPropagation();
             let headers, tsv;
             if (popupId === 'churned-popup') {
-                headers = "First Name\tLast Name\tPhone Number\tStore Name\tStore Address\tLast Sale Date\n";
+                headers = "First Name\tLast Name\tPhone Number\tStore Name\tStore Address\tLast Sale Date\tTransaction Count\n";
                 tsv = data.map(row => {
                     const formattedDate = formatDate(row['Created Date']);
-                    return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Store Name'] || ''}\t${row['Store Address'] || ''}\t${formattedDate === 'N/A' ? '' : formattedDate}`
+                    return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Store Name'] || ''}\t${row['Store Address'] || ''}\t${formattedDate === 'N/A' ? '' : formattedDate}\t${row['Transaction Count']}`
                 }).join('\n');
             } else {
                 headers = "First Name\tLast Name\tTransaction Count\tPhone Number\n";
