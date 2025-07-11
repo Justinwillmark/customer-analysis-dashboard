@@ -11,19 +11,69 @@
         main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
         .header-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
         .header-info { font-size: 0.9rem; color: #64748b; }
+        .controls { display: flex; align-items: center; gap: 1rem; }
+        .search-box {
+            padding: 0.5rem 0.75rem;
+            border: 1px solid #d1d5db;
+            border-radius: 0.5rem;
+            font-size: 0.9rem;
+            width: 250px;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+        .search-box:focus {
+            outline: none;
+            border-color: #2563eb;
+            box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
+        }
         .refresh-btn { background-color: #2563eb; color: white; border: none; padding: 0.6rem 1rem; border-radius: 0.5rem; font-weight: 600; cursor: pointer; transition: background-color 0.2s; }
         .refresh-btn:hover { background-color: #1d4ed8; }
         .refresh-btn:disabled { background-color: #9ca3af; cursor: not-allowed; }
-        table { width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-radius: 0.75rem; overflow: hidden; font-size: 0.9rem; }
-        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #e2e8f0; }
+        table { width: 100%; border-collapse: collapse; background-color: white; box-shadow: 0 1px 3px rgba(0,0,0,0.05); border-radius: 0.75rem; overflow: hidden; font-size: 0.9rem; table-layout: fixed; }
+        th, td { padding: 1rem; text-align: left; border-bottom: 1px solid #e2e8f0; word-wrap: break-word; }
         thead { background-color: #f1f5f9; }
         th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
+        .col-number { width: 4%; }
+        .col-name { width: 15%; }
+        .col-phone { width: 12%; }
+        .col-store-name { width: 15%; }
+        .col-lga { width: 10%; }
+        .col-address { width: 22%; }
+        .col-assigned { width: 12%; }
+        .col-status { width: 10%; text-align: center; }
         .status { font-weight: 700; padding: 0.25rem 0.5rem; border-radius: 999px; font-size: 0.8rem; text-align: center; }
         .status-reactivated { color: #15803d; background-color: #dcfce7; }
         .status-pending { color: #b45309; background-color: #fef3c7; }
-        tr.reactivated { background-color: #f0fdf4 !important; } /* Use important to override other styles */
+        tr.reactivated { background-color: #f0fdf4 !important; }
         tbody tr:nth-child(even) { background-color: #f8fafc; }
-        #loader { text-align: center; padding: 4rem; font-weight: 600; }
+        #loader, #no-results { text-align: center; padding: 4rem; font-weight: 600; color: #64748b; }
+
+        /* --- NEW STYLES FOR SUMMARY CARD --- */
+        #summary-card {
+            background: linear-gradient(135deg, #4f46e5, #7c3aed);
+            color: white;
+            padding: 1.5rem;
+            border-radius: 1rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 10px 25px -5px rgba(79, 70, 229, 0.3), 0 8px 10px -6px rgba(79, 70, 229, 0.1);
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .summary-stat h3 {
+            font-size: 1rem;
+            font-weight: 500;
+            opacity: 0.8;
+            margin: 0;
+        }
+        .summary-stat p {
+            font-size: 2.25rem;
+            font-weight: 700;
+            margin: 0;
+            line-height: 1.2;
+        }
+        .summary-countdown {
+            text-align: right;
+        }
     </style>
 </head>
 <body>
@@ -33,29 +83,44 @@
                 <h1 style="margin: 0;">Churn Reactivation Monitor</h1>
                 <p class="header-info" style="margin: 0.25rem 0 0 0;">Created on: <strong id="creation-date">...</strong> | Due Date: <strong id="due-date">...</strong></p>
             </div>
-            <button id="refresh-btn" class="refresh-btn">Refresh Status</button>
+            <div class="controls">
+                <input type="text" id="search-box" class="search-box" placeholder="Search by name, phone, store...">
+                <button id="refresh-btn" class="refresh-btn">Refresh Status</button>
+            </div>
         </div>
     </header>
     <main>
+        <div id="summary-card">
+            <div class="summary-stat">
+                <h3>Users Reactivated</h3>
+                <p id="reactivation-count">--/--</p>
+            </div>
+            <div class="summary-countdown summary-stat">
+                <h3>Time Remaining</h3>
+                <p id="days-remaining">--</p>
+            </div>
+        </div>
+
         <table>
             <thead>
                 <tr>
-                    <th>Retailer Name</th>
-                    <th>Phone Number</th>
-                    <th>Store Name</th>
-                    <th>LGA</th>
-                    <th>Last Sale Date</th>
-                    <th>Assigned To</th>
-                    <th>Status</th>
+                    <th class="col-number">#</th>
+                    <th class="col-name">Retailer Name</th>
+                    <th class="col-phone">Phone Number</th>
+                    <th class="col-store-name">Store Name</th>
+                    <th class="col-lga">LGA</th>
+                    <th class="col-address">Store Address</th>
+                    <th class="col-assigned">Assigned To</th>
+                    <th class="col-status">Status</th>
                 </tr>
             </thead>
             <tbody id="monitor-table-body">
                 </tbody>
         </table>
         <div id="loader">Loading assigned user data...</div>
+        <div id="no-results" style="display: none;">No users match your search.</div>
     </main>
     <script>
-        // Helper function to format dates
         function formatDate(dateString) {
             if (!dateString) return 'N/A';
             const date = new Date(dateString);
@@ -63,67 +128,94 @@
             return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
         }
 
-        // Helper function to get a date in YYYY-MM-DD format
         function toYYYYMMDD(d) {
             return d.toISOString().split('T')[0];
         }
 
-        // The main function to check for reactivated users
-        async function checkReactivationStatus(monitorCreationDate) {
+        function updateSummary(totalUsers, reactivatedCount, dueDate) {
+            document.getElementById('reactivation-count').textContent = `${reactivatedCount}/${totalUsers}`;
+            
+            const today = new Date();
+            today.setHours(0, 0, 0, 0);
+            const due = new Date(dueDate + 'T00:00:00');
+            const diffTime = due - today;
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+            const daysRemainingEl = document.getElementById('days-remaining');
+            if (diffDays < 0) {
+                daysRemainingEl.textContent = 'Past Due';
+            } else if (diffDays === 0) {
+                daysRemainingEl.textContent = 'Today';
+            } else {
+                daysRemainingEl.textContent = `${diffDays} Day${diffDays !== 1 ? 's' : ''}`;
+            }
+        }
+
+        async function checkReactivationStatus(monitorCreationDate, totalUsers, dueDate) {
             const refreshBtn = document.getElementById('refresh-btn');
             refreshBtn.textContent = 'Checking...';
             refreshBtn.disabled = true;
 
             const startDate = toYYYYMMDD(new Date(monitorCreationDate));
-            const endDate = toYYYYMMDD(new Date()); // Today's date
+            const endDate = toYYYYMMDD(new Date());
 
-            // Construct the API endpoint URL
             const API_ENDPOINT = `https://pika-inventory-94729b833f18.herokuapp.com/api/v1/admin/analytics/retention?download=retained-user-stats&startDate=${startDate}&endDate=${endDate}`;
 
             try {
-                // Fetch the list of all active users since the monitor was created
                 const response = await fetch(API_ENDPOINT);
-                if (!response.ok) {
-                    throw new Error(`Network response was not ok (${response.status})`);
-                }
+                if (!response.ok) throw new Error(`Network response was not ok (${response.status})`);
+                
                 const csvText = await response.text();
-
-                // Parse the CSV data to get phone numbers
                 const parseResult = Papa.parse(csvText, { header: true, skipEmptyLines: true });
-                if (parseResult.errors.length > 0) {
-                    throw new Error("Error parsing CSV data from the API.");
-                }
+                if (parseResult.errors.length > 0) throw new Error("Error parsing CSV data from the API.");
 
-                // Create a Set of active phone numbers for efficient lookup
                 const activePhoneNumbers = new Set(parseResult.data.map(user => user['Phone Number']));
+                let reactivatedCount = 0;
 
-                // Loop through the users on the page and update their status
                 document.querySelectorAll('#monitor-table-body tr').forEach(row => {
-                    const phoneOnPage = row.dataset.phone;
-                    if (activePhoneNumbers.has(phoneOnPage)) {
+                    if (activePhoneNumbers.has(row.dataset.phone)) {
                         row.classList.add('reactivated');
                         const statusCell = row.querySelector('.status');
                         statusCell.textContent = 'Reactivated';
                         statusCell.className = 'status status-reactivated';
+                        reactivatedCount++;
                     }
                 });
+                
+                updateSummary(totalUsers, reactivatedCount, dueDate);
 
             } catch (error) {
                 console.error('Error fetching reactivation status:', error);
-                alert('Could not fetch reactivation status. Please check the console for errors and ensure the API is available.');
+                alert('Could not fetch reactivation status. Please check the console for errors.');
             } finally {
                 refreshBtn.textContent = 'Refresh Status';
                 refreshBtn.disabled = false;
             }
         }
 
-        // Main function to initialize the page on load
+        function filterTable() {
+            const searchTerm = document.getElementById('search-box').value.toLowerCase();
+            const tableRows = document.querySelectorAll('#monitor-table-body tr');
+            let visibleCount = 0;
+
+            tableRows.forEach(row => {
+                const rowText = row.textContent.toLowerCase();
+                if (rowText.includes(searchTerm)) {
+                    row.style.display = '';
+                    visibleCount++;
+                } else {
+                    row.style.display = 'none';
+                }
+            });
+
+            document.getElementById('no-results').style.display = visibleCount === 0 ? 'block' : 'none';
+        }
+
         document.addEventListener('DOMContentLoaded', () => {
             const loader = document.getElementById('loader');
             const tableBody = document.getElementById('monitor-table-body');
             
             try {
-                // Decode the data from the URL hash
                 const encodedData = window.location.hash.substring(1);
                 if (!encodedData) {
                     loader.textContent = 'Error: No data found in the URL.';
@@ -136,29 +228,30 @@
 
                 const { assignedUsers, dueDate, creationDate } = monitorData;
 
-                // Update header info
                 document.getElementById('creation-date').textContent = new Date(creationDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
                 document.getElementById('due-date').textContent = new Date(dueDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
 
-                // Generate the table rows for all assigned users
-                const rowsHtml = assignedUsers.map(user => `
+                const rowsHtml = assignedUsers.map((user, index) => `
                 <tr data-phone="${user['Phone Number']}">
+                    <td>${index + 1}</td>
                     <td>${user['First Name']} ${user['Last Name']}</td>
                     <td>${user['Phone Number']}</td>
                     <td>${user['Store Name'] || 'N/A'}</td>
                     <td>${user['LGA'] || 'N/A'}</td>
-                    <td>${formatDate(user['Created Date'])}</td>
+                    <td>${user['Store Address'] || 'N/A'}</td>
                     <td>${user.assignedAE}</td>
-                    <td><span class="status status-pending">Pending</span></td>
+                    <td class="col-status"><span class="status status-pending">Pending</span></td>
                 </tr>`).join('');
                 tableBody.innerHTML = rowsHtml;
                 loader.style.display = 'none';
-
-                // Add event listener for the refresh button
-                document.getElementById('refresh-btn').addEventListener('click', () => checkReactivationStatus(creationDate));
                 
-                // Automatically check for reactivations on page load
-                checkReactivationStatus(creationDate);
+                const totalUsers = assignedUsers.length;
+                updateSummary(totalUsers, 0, dueDate);
+
+                document.getElementById('refresh-btn').addEventListener('click', () => checkReactivationStatus(creationDate, totalUsers, dueDate));
+                document.getElementById('search-box').addEventListener('input', filterTable);
+                
+                checkReactivationStatus(creationDate, totalUsers, dueDate);
 
             } catch (error) {
                 console.error('Failed to decode or render monitor data:', error);
