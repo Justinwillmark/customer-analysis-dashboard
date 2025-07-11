@@ -41,7 +41,7 @@ document.addEventListener('DOMContentLoaded', () => {
     // --- STATE MANAGEMENT & CONSTANTS ---
     let dataPeriod1 = [];
     let dataPeriod2 = [];
-    let churnUserDetails = []; // This will hold the detailed data for churned users
+    let churnUserDetails = [];
     let filteredData = [];
     let dateRange1 = null;
     let dateRange2 = null;
@@ -279,7 +279,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     if (period === 1) dataPeriod1 = parsedData;
                     else if (period === 2) dataPeriod2 = parsedData;
                     else if (period === 'churn') churnUserDetails = parsedData;
-
+                    
                     resolve();
                 },
                 error: (error) => reject(new Error(`CSV Parsing Error: ${error.message}`))
@@ -404,31 +404,26 @@ document.addEventListener('DOMContentLoaded', () => {
         const retainedData = dataPeriod2.filter(u => retainedUsersSet.has(u['Phone Number']));
         const newData = dataPeriod2.filter(u => newUsersSet.has(u['Phone Number']));
         
-        // --- THE ACCURATE FIX ---
-        // 1. Create a map of the detailed churn user data for easy lookup.
         const churnDetailsMap = new Map(churnUserDetails.map(u => [u['Phone Number'], u]));
         
-        // 2. The definitive list of churned users comes from Period 1 data, filtered by the accurate churned phone numbers set.
-        const churnedData = dataPeriod1
-            .filter(user => churnedPhoneNumbers.has(user['Phone Number']))
-            .map(user => {
-                // 3. Enrich this definitive list with details (like Created Date) from the churn-specific API call.
-                const details = churnDetailsMap.get(user['Phone Number']);
-                return {
-                    ...user, // This provides the correct Transaction Count from Period 1
-                    'Created Date': details ? details['Created Date'] : user['Created Date'], // Use the detailed date if available
-                    'Store Name': details ? details['Store Name'] : user['Store Name'],
-                    'Store Address': details ? details['Store Address'] : user['Store Address'],
-                    'LGA': details ? details['LGA'] : user['LGA']
-                };
-            });
-
+        const churnedData = Array.from(churnedPhoneNumbers).map(phone => {
+            const p1Data = dataPeriod1.find(u => u['Phone Number'] === phone);
+            const details = churnDetailsMap.get(phone);
+            return {
+                ...p1Data,
+                'Created Date': details ? details['Created Date'] : (p1Data ? p1Data['Created Date'] : null),
+                'Store Name': details ? details['Store Name'] : (p1Data ? p1Data['Store Name'] : 'N/A'),
+                'Store Address': details ? details['Store Address'] : (p1Data ? p1Data['Store Address'] : 'N/A'),
+                'LGA': details ? details['LGA'] : (p1Data ? p1Data['LGA'] : 'N/A'),
+            };
+        });
+        
         const retentionRate = usersP1PhoneNumbers.size > 0 ? (retainedUsersSet.size / usersP1PhoneNumbers.size * 100).toFixed(1) : 0;
         
         document.getElementById('retention-rate').textContent = `${retentionRate}%`;
         document.getElementById('retained-users').textContent = retainedUsersSet.size;
         document.getElementById('new-users').textContent = newUsersSet.size;
-        document.getElementById('churned-users').textContent = churnedPhoneNumbers.size; // This count is now guaranteed to match the list.
+        document.getElementById('churned-users').textContent = churnedData.length;
         document.getElementById('total-users').textContent = usersP2PhoneNumbers.size;
 
         const period1Text = formatPeriodText(dateRange1);
@@ -441,7 +436,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
         createPopupTable('retained-popup', 'Retained Users', retainedData);
         createPopupTable('new-popup', 'New Users', newData);
-        createPopupTable('churned-popup', 'Churned Users', churnedData); // This now uses the accurate, enriched list.
+        createPopupTable('churned-popup', 'Churned Users', churnedData);
         createPopupTable('total-popup', 'Total Active Users', dataPeriod2);
 
         tableTitle.textContent = `User Data for ${period2Text}`;
@@ -459,7 +454,7 @@ document.addEventListener('DOMContentLoaded', () => {
         reportData = {
             retentionRate: retentionRate,
             newUsers: newUsersSet.size,
-            churnedUsers: churnedPhoneNumbers.size,
+            churnedUsers: churnedData.length,
             totalActiveUsers: usersP2PhoneNumbers.size,
             period1Text: period1Text,
             period2Text: period2Text,
@@ -823,7 +818,8 @@ Date & Time Stamp of Generated Report: ${timestamp}
             const monitorData = {
                 assignedUsers,
                 dueDate,
-                creationDate: new Date().toISOString()
+                creationDate: new Date().toISOString(),
+                churnPeriod: dateRange1
             };
 
             const jsonString = JSON.stringify(monitorData);

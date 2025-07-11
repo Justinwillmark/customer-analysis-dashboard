@@ -11,6 +11,7 @@
         main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
         .header-content { display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 1rem; }
         .header-info { font-size: 0.9rem; color: #64748b; }
+        .churn-period-subtext { font-size: 0.9rem; color: #e11d48; font-weight: 500; }
         .controls { display: flex; align-items: center; gap: 1rem; }
         .search-box {
             padding: 0.5rem 0.75rem;
@@ -34,10 +35,11 @@
         th { font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: #475569; }
         .col-number { width: 4%; }
         .col-name { width: 15%; }
-        .col-phone { width: 12%; }
-        .col-store-name { width: 15%; }
+        .col-phone { width: 10%; }
+        .col-last-sale { width: 10%; }
+        .col-store-name { width: 14%; }
         .col-lga { width: 10%; }
-        .col-address { width: 22%; }
+        .col-address { width: 15%; }
         .col-assigned { width: 12%; }
         .col-status { width: 10%; text-align: center; }
         .status { font-weight: 700; padding: 0.25rem 0.5rem; border-radius: 999px; font-size: 0.8rem; text-align: center; }
@@ -47,7 +49,6 @@
         tbody tr:nth-child(even) { background-color: #f8fafc; }
         #loader, #no-results { text-align: center; padding: 4rem; font-weight: 600; color: #64748b; }
 
-        /* --- NEW STYLES FOR SUMMARY CARD --- */
         #summary-card {
             background: linear-gradient(135deg, #4f46e5, #7c3aed);
             color: white;
@@ -81,7 +82,8 @@
         <div class="header-content">
             <div>
                 <h1 style="margin: 0;">Pika Churn Reactivation Monitor</h1>
-                <p class="header-info" style="margin: 0.25rem 0 0 0;">Created on: <strong id="creation-date">...</strong> | Due Date: <strong id="due-date">...</strong></p>
+                <p id="churn-period-subtext" class="churn-period-subtext"></p>
+                <p class="header-info" style="margin: 0.25rem 0 0 0;">Monitor created on: <strong id="creation-date">...</strong> | Due Date: <strong id="due-date">...</strong></p>
             </div>
             <div class="controls">
                 <input type="text" id="search-box" class="search-box" placeholder="Search by name, phone, store...">
@@ -107,6 +109,7 @@
                     <th class="col-number">#</th>
                     <th class="col-name">Retailer Name</th>
                     <th class="col-phone">Phone Number</th>
+                    <th class="col-last-sale">Last Sale Date</th>
                     <th class="col-store-name">Store Name</th>
                     <th class="col-lga">LGA</th>
                     <th class="col-address">Store Address</th>
@@ -130,6 +133,20 @@
 
         function toYYYYMMDD(d) {
             return d.toISOString().split('T')[0];
+        }
+
+        function formatPeriodText(range) {
+            if (!range || !range.start) return 'N/A';
+            const startDate = new Date(range.start + 'T00:00:00');
+            const endDate = new Date(range.end + 'T00:00:00');
+            const startYear = startDate.getFullYear();
+            const endYear = endDate.getFullYear();
+
+            if (startYear !== endYear) {
+                return `Churned between ${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+            } else {
+                return `Churned between ${startDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric' })} - ${endDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`;
+            }
         }
 
         function updateSummary(totalUsers, reactivatedCount, dueDate) {
@@ -226,16 +243,19 @@
                 const decompressed = pako.inflate(compressedArray, { to: 'string' });
                 const monitorData = JSON.parse(decompressed);
 
-                const { assignedUsers, dueDate, creationDate } = monitorData;
+                const { assignedUsers, dueDate, creationDate, churnPeriod } = monitorData;
 
                 document.getElementById('creation-date').textContent = new Date(creationDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
                 document.getElementById('due-date').textContent = new Date(dueDate + 'T00:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+                document.getElementById('churn-period-subtext').textContent = formatPeriodText(churnPeriod);
+
 
                 const rowsHtml = assignedUsers.map((user, index) => `
                 <tr data-phone="${user['Phone Number']}">
                     <td>${index + 1}</td>
                     <td>${user['First Name']} ${user['Last Name']}</td>
                     <td>${user['Phone Number']}</td>
+                    <td>${formatDate(user['Created Date'])}</td>
                     <td>${user['Store Name'] || 'N/A'}</td>
                     <td>${user['LGA'] || 'N/A'}</td>
                     <td>${user['Store Address'] || 'N/A'}</td>
