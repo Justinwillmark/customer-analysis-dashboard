@@ -320,68 +320,68 @@ document.addEventListener('DOMContentLoaded', () => {
         reader.readAsText(file);
     };
 
-    const handleApiFetch = async () => {
-        let baseUrl = apiUrlInput.value.trim();
-        let start1, end1, start2, end2;
+const handleApiFetch = async () => {
+    let baseUrl = apiUrlInput.value.trim();
+    let start1, end1, start2, end2;
 
-        resetError();
+    resetError();
 
-        if (cohortToggle.checked) {
-            start1 = apiStart1Input.value; end1 = apiEnd1Input.value;
-            start2 = apiStart2Input.value; end2 = apiEnd2Input.value;
-            if (!baseUrl || !start1 || !end1 || !start2 || !end2) {
-                alert('Please fill in the Base API URL and select all dates for both periods.');
-                return;
-            }
-        } else {
-            const churnStart = apiStartChurnInput.value, churnEnd = apiEndChurnInput.value;
-            if (!baseUrl || !churnStart || !churnEnd) {
-                alert('Please fill in the Base API URL and select an observation date range.');
-                return;
-            }
-            start2 = churnStart; end2 = churnEnd;
-            const period2StartDate = new Date(churnStart + 'T00:00:00');
-            const period1EndDate = new Date(period2StartDate);
-            period1EndDate.setDate(period1EndDate.getDate() - 1);
-            const period1StartDate = new Date(period1EndDate);
-            const daysDifference = (new Date(churnEnd) - new Date(churnStart)) / (1000 * 3600 * 24);
-            period1StartDate.setDate(period1EndDate.getDate() - daysDifference);
-            start1 = toYYYYMMDD(period1StartDate);
-            end1 = toYYYYMMDD(period1EndDate);
+    if (cohortToggle.checked) {
+        start1 = apiStart1Input.value; end1 = apiEnd1Input.value;
+        start2 = apiStart2Input.value; end2 = apiEnd2Input.value;
+        if (!baseUrl || !start1 || !end1 || !start2 || !end2) {
+            alert('Please fill in the Base API URL and select all dates for both periods.');
+            return;
         }
-
-        loadingOverlay.classList.remove('hidden'); 
-        showStatus('Fetching data from API...');
-        dateRange1 = { start: start1, end: end1 };
-        dateRange2 = { start: start2, end: end2 };
-
-        const retentionEndpoint = baseUrl.replace('/churn', '/retention');
-        const url1 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start1}&endDate=${end1}`;
-        const url2 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start2}&endDate=${end2}`;
-        const churnUrl = `${retentionEndpoint}?download=churned-users&startDate=${start1}&endDate=${end1}`;
-        
-        try {
-            const [response1, response2, churnResponse] = await Promise.all([fetch(url1), fetch(url2), fetch(churnUrl)]);
-
-            if (!response1.ok) throw new Error(`API error for Period 1: ${response1.status} ${response1.statusText}`);
-            if (!response2.ok) throw new Error(`API error for Period 2: ${response2.status} ${response2.statusText}`);
-            if (!churnResponse.ok) throw new Error(`API error for Churn Data: ${churnResponse.status} ${churnResponse.statusText}`);
-
-            const [csvText1, csvText2, churnCsvText] = await Promise.all([response1.text(), response2.text(), churnResponse.text()]);
-
-            await Promise.all([
-                parseAndProcessData(csvText1, 1),
-                parseAndProcessData(csvText2, 2),
-                parseAndProcessData(churnCsvText, 'churn')
-            ]);
-            analyzeData();
-        } catch (error) {
-            console.error(error);
-            showError(`Failed to fetch or process API data. Error: ${error.message}`);
-        } finally {
-            loadingOverlay.classList.add('hidden');
+    } else {
+        const churnStart = apiStartChurnInput.value, churnEnd = apiEndChurnInput.value;
+        if (!baseUrl || !churnStart || !churnEnd) {
+            alert('Please fill in the Base API URL and select an observation date range.');
+            return;
         }
-    };
+        const churnStartDate = new Date(churnStart + 'T00:00:00');
+        const period1EndDate = new Date(churnStartDate);
+        period1EndDate.setDate(period1EndDate.getDate() - 1);
+        const period1StartDate = new Date(churnStartDate);
+        period1StartDate.setDate(period1StartDate.getDate() - 30);
+        start1 = toYYYYMMDD(period1StartDate);
+        end1 = toYYYYMMDD(period1EndDate);
+        start2 = churnStart;
+        end2 = churnEnd;
+    }
+
+    loadingOverlay.classList.remove('hidden'); 
+    showStatus('Fetching data from API...');
+    dateRange1 = { start: start1, end: end1 };
+    dateRange2 = { start: start2, end: end2 };
+
+    const retentionEndpoint = baseUrl.replace('/churn', '/retention');
+    const url1 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start1}&endDate=${end1}`;
+    const url2 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start2}&endDate=${end2}`;
+    const churnUrl = `${retentionEndpoint}?download=churned-users&startDate=${start1}&endDate=${end1}`;
+    
+    try {
+        const [response1, response2, churnResponse] = await Promise.all([fetch(url1), fetch(url2), fetch(churnUrl)]);
+
+        if (!response1.ok) throw new Error(`API error for Period 1: ${response1.status} ${response1.statusText}`);
+        if (!response2.ok) throw new Error(`API error for Period 2: ${response2.status} ${response2.statusText}`);
+        if (!churnResponse.ok) throw new Error(`API error for Churn Data: ${churnResponse.status} ${churnResponse.statusText}`);
+
+        const [csvText1, csvText2, churnCsvText] = await Promise.all([response1.text(), response2.text(), churnResponse.text()]);
+
+        await Promise.all([
+            parseAndProcessData(csvText1, 1),
+            parseAndProcessData(csvText2, 2),
+            parseAndProcessData(churnCsvText, 'churn')
+        ]);
+        analyzeData();
+    } catch (error) {
+        console.error(error);
+        showError(`Failed to fetch or process API data. Error: ${error.message}`);
+    } finally {
+        loadingOverlay.classList.add('hidden');
+    }
+};
 
     const enablePeriod2Upload = () => {
         uploadContainer2.classList.remove('disabled');

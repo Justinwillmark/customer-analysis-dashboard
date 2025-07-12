@@ -156,51 +156,58 @@ document.addEventListener('DOMContentLoaded', () => {
         reactivatedProgress.style.width = `${percentage}%`;
     };
 
-    const refreshStatuses = async () => {
-        if (!monitorData.apiBaseUrl || !monitorData.reactivationStartDate) {
-            alert('Missing API configuration. Cannot refresh statuses.');
-            return;
-        }
+const refreshStatuses = async () => {
+    if (!monitorData.apiBaseUrl || !monitorData.reactivationStartDate) {
+        alert('Missing API configuration. Cannot refresh statuses.');
+        return;
+    }
 
-        refreshBtn.disabled = true;
-        refreshBtnText.textContent = 'Refreshing...';
-        refreshIcon.classList.add('hidden');
-        loadingSpinner.classList.remove('hidden');
+    refreshBtn.disabled = true;
+    refreshBtnText.textContent = 'Refreshing...';
+    refreshIcon.classList.add('hidden');
+    loadingSpinner.classList.remove('hidden');
 
-        try {
-            const today = toYYYYMMDD(new Date());
-            const retentionEndpoint = monitorData.apiBaseUrl.replace('/churn', '/retention');
-            const url = `${retentionEndpoint}?download=retained-user-stats&startDate=${monitorData.reactivationStartDate}&endDate=${today}`;
-            
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
-            
-            const csvText = await response.text();
-            const result = await new Promise((resolve, reject) => {
-                Papa.parse(csvText, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: resolve,
-                    error: reject
-                });
+    try {
+        const reactivationStart = new Date(monitorData.reactivationStartDate + 'T00:00:00');
+        const startDate = new Date(reactivationStart);
+        startDate.setDate(startDate.getDate() - 1); // Start from the day before reactivationStartDate
+        const today = new Date();
+        const endDate = new Date(today);
+        endDate.setDate(endDate.getDate() + 1); // End at tomorrow
+        const startDateStr = toYYYYMMDD(startDate);
+        const endDateStr = toYYYYMMDD(endDate);
+        const retentionEndpoint = monitorData.apiBaseUrl.replace('/churn', '/retention');
+        const url = `${retentionEndpoint}?download=retained-user-stats&startDate=${startDateStr}&endDate=${endDateStr}`;
+        
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+        
+        const csvText = await response.text();
+        const result = await new Promise((resolve, reject) => {
+            Papa.parse(csvText, {
+                header: true,
+                skipEmptyLines: true,
+                complete: resolve,
+                error: reject
             });
+        });
 
-            const activePhoneNumbers = new Set(result.data.map(row => row['Phone Number']));
-            assignedUsers.forEach(user => {
-                user.status = activePhoneNumbers.has(user['Phone Number']) ? 'Reactivated' : 'Churned';
-            });
+        const activePhoneNumbers = new Set(result.data.map(row => row['Phone Number']));
+        assignedUsers.forEach(user => {
+            user.status = activePhoneNumbers.has(user['Phone Number']) ? 'Reactivated' : 'Churned';
+        });
 
-            handleSearch(); // Re-render table with search term applied
-        } catch (error) {
-            console.error('Error refreshing statuses:', error);
-            alert(`Failed to refresh statuses: ${error.message}`);
-        } finally {
-            refreshBtn.disabled = false;
-            refreshBtnText.textContent = 'Refresh Status';
-            refreshIcon.classList.remove('hidden');
-            loadingSpinner.classList.add('hidden');
-        }
-    };
+        handleSearch(); // Re-render table with search term applied
+    } catch (error) {
+        console.error('Error refreshing statuses:', error);
+        alert(`Failed to refresh statuses: ${error.message}`);
+    } finally {
+        refreshBtn.disabled = false;
+        refreshBtnText.textContent = 'Refresh Status';
+        refreshIcon.classList.remove('hidden');
+        loadingSpinner.classList.add('hidden');
+    }
+};
 
     // Initialization
     if (decodeMonitorData()) {
