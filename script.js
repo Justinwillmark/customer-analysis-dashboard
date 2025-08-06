@@ -280,17 +280,18 @@ document.addEventListener('DOMContentLoaded', () => {
                     else if (period === 2) dataPeriod2 = parsedData;
                     else if (period === 'churn') churnUserDetails = parsedData;
                     
-                    resolve();
+                    resolve(parsedData); // Resolve with the data
                 },
                 error: (error) => reject(new Error(`CSV Parsing Error: ${error.message}`))
             });
         });
     };
 
-    const handleFileUpload = (file, period) => {
+    const handleFileUpload = async (file, period) => {
         if (!file) return;
 
         resetError();
+        loadingOverlay.classList.remove('hidden');
         showStatus(`Processing ${file.name}...`);
         period2Label = null; 
 
@@ -311,77 +312,91 @@ document.addEventListener('DOMContentLoaded', () => {
                     fileName2.textContent = file.name;
                     dateRangeEl2.textContent = '';
                     churnUserDetails = dataPeriod1; 
-                    analyzeData();
+                    await analyzeData();
+                    hideStatus();
+                    dashboard.classList.remove('hidden');
+                    dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             } catch (error) {
                 showError(error.message);
+            } finally {
+                 if (period === 2) {
+                    loadingOverlay.classList.add('hidden');
+                 }
             }
         };
         reader.readAsText(file);
     };
 
-const handleApiFetch = async () => {
-    let baseUrl = apiUrlInput.value.trim();
-    let start1, end1, start2, end2;
+    const handleApiFetch = async () => {
+        let baseUrl = apiUrlInput.value.trim();
+        let start1, end1, start2, end2;
 
-    resetError();
+        resetError();
 
-    if (cohortToggle.checked) {
-        start1 = apiStart1Input.value; end1 = apiEnd1Input.value;
-        start2 = apiStart2Input.value; end2 = apiEnd2Input.value;
-        if (!baseUrl || !start1 || !end1 || !start2 || !end2) {
-            alert('Please fill in the Base API URL and select all dates for both periods.');
-            return;
+        if (cohortToggle.checked) {
+            start1 = apiStart1Input.value; end1 = apiEnd1Input.value;
+            start2 = apiStart2Input.value; end2 = apiEnd2Input.value;
+            if (!baseUrl || !start1 || !end1 || !start2 || !end2) {
+                alert('Please fill in the Base API URL and select all dates for both periods.');
+                return;
+            }
+        } else {
+            const churnStart = apiStartChurnInput.value, churnEnd = apiEndChurnInput.value;
+            if (!baseUrl || !churnStart || !churnEnd) {
+                alert('Please fill in the Base API URL and select an observation date range.');
+                return;
+            }
+            const churnStartDate = new Date(churnStart + 'T00:00:00');
+            const period1EndDate = new Date(churnStartDate);
+            period1EndDate.setDate(period1EndDate.getDate() - 1);
+            const period1StartDate = new Date(churnStartDate);
+            period1StartDate.setDate(period1StartDate.getDate() - 30);
+            start1 = toYYYYMMDD(period1StartDate);
+            end1 = toYYYYMMDD(period1EndDate);
+            start2 = churnStart;
+            end2 = churnEnd;
         }
-    } else {
-        const churnStart = apiStartChurnInput.value, churnEnd = apiEndChurnInput.value;
-        if (!baseUrl || !churnStart || !churnEnd) {
-            alert('Please fill in the Base API URL and select an observation date range.');
-            return;
+
+        loadingOverlay.classList.remove('hidden'); 
+        showStatus('Fetching data from API...');
+        dateRange1 = { start: start1, end: end1 };
+        dateRange2 = { start: start2, end: end2 };
+        
+        try {
+            const retentionEndpoint = baseUrl.replace('/churn', '/retention');
+            const url1 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start1}&endDate=${end1}`;
+            const url2 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start2}&endDate=${end2}`;
+            const churnUrl = `${retentionEndpoint}?download=churned-users&startDate=${start1}&endDate=${end1}`;
+        
+            const [response1, response2, churnResponse] = await Promise.all([fetch(url1), fetch(url2), fetch(churnUrl)]);
+
+            if (!response1.ok) throw new Error(`API error for Period 1: ${response1.status} ${response1.statusText}`);
+            if (!response2.ok) throw new Error(`API error for Period 2: ${response2.status} ${response2.statusText}`);
+            if (!churnResponse.ok) throw new Error(`API error for Churn Data: ${churnResponse.status} ${churnResponse.statusText}`);
+
+            showStatus('Parsing data...');
+            const [csvText1, csvText2, churnCsvText] = await Promise.all([response1.text(), response2.text(), churnResponse.text()]);
+
+            await Promise.all([
+                parseAndProcessData(csvText1, 1),
+                parseAndProcessData(csvText2, 2),
+                parseAndProcessData(churnCsvText, 'churn')
+            ]);
+            
+            await analyzeData();
+
+            hideStatus();
+            dashboard.classList.remove('hidden');
+            dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+        } catch (error) {
+            console.error(error);
+            showError(`Failed to fetch or process API data. Error: ${error.message}`);
+        } finally {
+            loadingOverlay.classList.add('hidden');
         }
-        const churnStartDate = new Date(churnStart + 'T00:00:00');
-        const period1EndDate = new Date(churnStartDate);
-        period1EndDate.setDate(period1EndDate.getDate() - 1);
-        const period1StartDate = new Date(churnStartDate);
-        period1StartDate.setDate(period1StartDate.getDate() - 30);
-        start1 = toYYYYMMDD(period1StartDate);
-        end1 = toYYYYMMDD(period1EndDate);
-        start2 = churnStart;
-        end2 = churnEnd;
-    }
-
-    loadingOverlay.classList.remove('hidden'); 
-    showStatus('Fetching data from API...');
-    dateRange1 = { start: start1, end: end1 };
-    dateRange2 = { start: start2, end: end2 };
-
-    const retentionEndpoint = baseUrl.replace('/churn', '/retention');
-    const url1 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start1}&endDate=${end1}`;
-    const url2 = `${retentionEndpoint}?download=retained-user-stats&startDate=${start2}&endDate=${end2}`;
-    const churnUrl = `${retentionEndpoint}?download=churned-users&startDate=${start1}&endDate=${end1}`;
-    
-    try {
-        const [response1, response2, churnResponse] = await Promise.all([fetch(url1), fetch(url2), fetch(churnUrl)]);
-
-        if (!response1.ok) throw new Error(`API error for Period 1: ${response1.status} ${response1.statusText}`);
-        if (!response2.ok) throw new Error(`API error for Period 2: ${response2.status} ${response2.statusText}`);
-        if (!churnResponse.ok) throw new Error(`API error for Churn Data: ${churnResponse.status} ${churnResponse.statusText}`);
-
-        const [csvText1, csvText2, churnCsvText] = await Promise.all([response1.text(), response2.text(), churnResponse.text()]);
-
-        await Promise.all([
-            parseAndProcessData(csvText1, 1),
-            parseAndProcessData(csvText2, 2),
-            parseAndProcessData(churnCsvText, 'churn')
-        ]);
-        analyzeData();
-    } catch (error) {
-        console.error(error);
-        showError(`Failed to fetch or process API data. Error: ${error.message}`);
-    } finally {
-        loadingOverlay.classList.add('hidden');
-    }
-};
+    };
 
     const enablePeriod2Upload = () => {
         uploadContainer2.classList.remove('disabled');
@@ -391,7 +406,7 @@ const handleApiFetch = async () => {
         fileName2.textContent = 'Drag & drop or click to upload';
     };
 
-    const analyzeData = () => {
+    const analyzeData = async () => {
         showStatus('Analyzing data...');
         
         const usersP1PhoneNumbers = new Set(dataPeriod1.map(u => u['Phone Number']));
@@ -442,15 +457,26 @@ const handleApiFetch = async () => {
         tableTitle.textContent = `User Data for ${period2Text}`;
         tableDescription.textContent = `Showing ${dataPeriod2.length} total users in this period.`;
 
-        renderCharts({ p1: { count: usersP1PhoneNumbers.size }, p2: { count: usersP2PhoneNumbers.size }, retained: retainedUsersSet.size });
-        
-        const totalTransactionsP1 = dataPeriod1.reduce((sum, u) => sum + (u['Transaction Count'] || 0), 0);
-        const totalTransactionsP2 = dataPeriod2.reduce((sum, u) => sum + (u['Transaction Count'] || 0), 0);
-        const totalAmountP1 = dataPeriod1.reduce((sum, u) => sum + (u['Total Amount'] || 0), 0);
-        const totalAmountP2 = dataPeriod2.reduce((sum, u) => sum + (u['Total Amount'] || 0), 0);
-        
-        renderTransactionChart({ p1: { count: totalTransactionsP1, amount: totalAmountP1 }, p2: { count: totalTransactionsP2, amount: totalAmountP2 } });
+        // 90-DAY CHART RENDERING
+        if (dateRange2 && dateRange2.end && dateRange2.end !== 'Data') {
+             await fetchAndRender90DayCharts(dateRange2.end);
+        } else {
+            destroyCharts();
+            const userCtx = document.getElementById('user-chart').getContext('2d');
+            userCtx.clearRect(0, 0, userCtx.canvas.width, userCtx.canvas.height);
+            userCtx.font = "16px Inter";
+            userCtx.fillStyle = "#64748b";
+            userCtx.textAlign = "center";
+            userCtx.fillText("90-day trend not available for file uploads.", userCtx.canvas.width / 2, 50);
 
+            const transCtx = document.getElementById('transaction-chart').getContext('2d');
+            transCtx.clearRect(0, 0, transCtx.canvas.width, transCtx.canvas.height);
+            transCtx.font = "16px Inter";
+            transCtx.fillStyle = "#64748b";
+            transCtx.textAlign = "center";
+            transCtx.fillText("90-day trend not available for file uploads.", transCtx.canvas.width / 2, 50);
+        }
+        
         reportData = {
             retentionRate: retentionRate,
             newUsers: newUsersSet.size,
@@ -471,11 +497,6 @@ const handleApiFetch = async () => {
         reportInfoIcon.classList.remove('hidden');
 
         applyFilters();
-
-        hideStatus();
-        dashboard.classList.remove('hidden');
-
-        dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
     };
 
     const showReportModal = () => {
@@ -867,17 +888,321 @@ Date & Time Stamp of Generated Report: ${timestamp}
 
     const destroyCharts = () => { Object.values(charts).forEach(chart => { if (chart) chart.destroy(); }); charts = {}; };
 
-    const renderCharts = (data) => {
-        if (charts.userChart) charts.userChart.destroy();
-        const userCtx = document.getElementById('user-chart').getContext('2d');
-        charts.userChart = new Chart(userCtx, { type: 'bar', data: { labels: [`Period 1 Users`, `Period 2 Users`], datasets: [{ label: 'Total Users', data: [data.p1.count, data.p2.count], backgroundColor: ['#60a5fa', '#34d399'], borderColor: ['#3b82f6', '#10b981'], borderWidth: 1 }, { label: 'Retained', data: [0, data.retained], backgroundColor: '#a78bfa', borderColor: '#8b5cf6', borderWidth: 1 }] }, options: { responsive: true, plugins: { legend: { position: 'top' }, title: { display: false } }, scales: { y: { beginAtZero: true } } } });
+    // --- NEW 90-DAY CHARTING LOGIC ---
+
+    const fetchAndRender90DayCharts = async (endDateStr) => {
+        const baseUrl = apiUrlInput.value.trim();
+        if (!baseUrl || !endDateStr) return;
+
+        showStatus('Fetching 90-day trend data...');
+
+        const retentionEndpoint = baseUrl.replace('/churn', '/retention');
+        const endDate = new Date(endDateStr + 'T00:00:00');
+
+        const periods = [];
+        const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+        let currentEnd = new Date(endDate);
+
+        if (endDate.getDate() < 28) { // If period is not a full month, go back to previous full month's end
+            currentEnd = new Date(endDate.getFullYear(), endDate.getMonth(), 0);
+        }
+        
+        for (let i = 0; i < 4; i++) {
+            const pEnd = new Date(currentEnd);
+            const pStart = new Date(pEnd.getFullYear(), pEnd.getMonth(), 1);
+            periods.unshift({
+                name: `${monthNames[pStart.getMonth()]} ${pStart.getFullYear()}`,
+                start: toYYYYMMDD(pStart),
+                end: toYYYYMMDD(pEnd)
+            });
+            // This logic correctly handles all month lengths (30, 31, 28, 29 days)
+            currentEnd = new Date(pStart.getFullYear(), pStart.getMonth(), 0); // End of previous month
+        }
+
+        const urls = periods.map(p => `${retentionEndpoint}?download=retained-user-stats&startDate=${p.start}&endDate=${p.end}`);
+        
+        try {
+            const responses = await Promise.all(urls.map(url => fetch(url)));
+            for (const response of responses) {
+                if (!response.ok) throw new Error(`API error: ${response.statusText}`);
+            }
+            const csvTexts = await Promise.all(responses.map(res => res.text()));
+            const allPeriodsData = await Promise.all(csvTexts.map(csv => parseAndProcessData(csv)));
+
+            const chartMetrics = [];
+            // This loop correctly calculates metrics for the last 3 months by comparing each to its prior month.
+            // This ensures the data for both charts is accurate and synchronized.
+            for (let i = 1; i < allPeriodsData.length; i++) {
+                const priorPeriodData = allPeriodsData[i - 1];
+                const currentPeriodData = allPeriodsData[i];
+
+                const priorUsers = new Set(priorPeriodData.map(u => u['Phone Number']));
+                const currentUsers = new Set(currentPeriodData.map(u => u['Phone Number']));
+
+                const retained = new Set([...priorUsers].filter(phone => currentUsers.has(phone)));
+                const newUsers = new Set([...currentUsers].filter(phone => !priorUsers.has(phone)));
+                const churned = new Set([...priorUsers].filter(phone => !currentUsers.has(phone)));
+
+                const totalTransactions = currentPeriodData.reduce((sum, u) => sum + (u['Transaction Count'] || 0), 0);
+                const totalAmount = currentPeriodData.reduce((sum, u) => sum + (u['Total Amount'] || 0), 0);
+
+                chartMetrics.push({
+                    name: periods[i].name,
+                    retained: retained.size,
+                    new: newUsers.size,
+                    churned: churned.size,
+                    totalUsers: currentUsers.size,
+                    totalTransactions,
+                    totalAmount
+                });
+            }
+            
+            renderUserOverviewChart(chartMetrics);
+            renderTransactionComparisonChart(chartMetrics);
+
+        } catch (error) {
+            console.error("Error fetching 90-day trend data:", error);
+            showError(`Failed to fetch 90-day trend data: ${error.message}`);
+        }
     };
 
-    const renderTransactionChart = (data) => {
+    const renderUserOverviewChart = (data) => {
+        if (charts.userChart) charts.userChart.destroy();
+        const userCtx = document.getElementById('user-chart').getContext('2d');
+    
+        const labels = data.map(d => d.name);
+        const retainedData = data.map(d => d.retained);
+        const newData = data.map(d => d.new);
+        const churnedData = data.map(d => d.churned);
+    
+        const retentionRateData = data.map(d => {
+            const priorTotal = d.retained + d.churned;
+            return priorTotal > 0 ? parseFloat(((d.retained / priorTotal) * 100).toFixed(1)) : 0;
+        });
+    
+        const createGradient = (color, opacity = 0.4) => {
+            const gradient = userCtx.createLinearGradient(0, 0, 0, 350);
+            gradient.addColorStop(0, `${color}${Math.round(opacity * 255).toString(16).padStart(2, '0')}`);
+            gradient.addColorStop(1, `${color}00`);
+            return gradient;
+        };
+
+        const allUserCounts = [...retainedData, ...newData, ...churnedData];
+        const maxUserCount = Math.max(...allUserCounts);
+        const suggestedMaxUsers = maxUserCount > 0 ? Math.ceil((maxUserCount * 1.2) / 10) * 10 : 10;
+        
+        const lineChartData = [
+            {
+                label: 'Retained Users',
+                data: retainedData,
+                borderColor: '#34d399',
+                pointBackgroundColor: '#34d399',
+                backgroundColor: createGradient('#34d399'),
+                yAxisID: 'y',
+            },
+            {
+                label: 'New Users',
+                data: newData,
+                borderColor: '#60a5fa',
+                pointBackgroundColor: '#60a5fa',
+                backgroundColor: createGradient('#60a5fa'),
+                yAxisID: 'y',
+            },
+            {
+                label: 'Churned Users (from prior)',
+                data: churnedData,
+                borderColor: '#ef4444',
+                pointBackgroundColor: '#ef4444',
+                backgroundColor: createGradient('#ef4444'),
+                yAxisID: 'y',
+            },
+            {
+                label: 'Retention Rate',
+                data: retentionRateData,
+                borderColor: '#a855f7',
+                pointBackgroundColor: '#a855f7',
+                backgroundColor: 'transparent',
+                yAxisID: 'y1',
+                borderDash: [5, 5],
+                borderWidth: 2.5,
+            }
+        ];
+
+        const annotations = {};
+        for (let i = 0; i < labels.length - 1; i++) {
+            annotations[`line${i}`] = {
+                type: 'line',
+                xMin: i + 0.5,
+                xMax: i + 0.5,
+                borderColor: 'rgba(203, 213, 225, 0.7)', // slate-300 with opacity
+                borderWidth: 1,
+                borderDash: [6, 6],
+            };
+        }
+    
+        charts.userChart = new Chart(userCtx, {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: lineChartData.map(ds => ({
+                    ...ds,
+                    tension: 0.4,
+                    fill: true,
+                    pointBorderColor: '#fff',
+                    pointBorderWidth: 1.5,
+                    pointRadius: 5,
+                    pointHoverRadius: 7,
+                    pointHoverBorderColor: '#fff',
+                    pointHoverBorderWidth: 2,
+                }))
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: {
+                    mode: 'index',
+                    intersect: false,
+                },
+                plugins: {
+                    legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8, padding: 20 } },
+                    title: { display: false },
+                    tooltip: {
+                        backgroundColor: 'rgba(15, 23, 42, 0.85)', // slate-900
+                        titleFont: { weight: 'bold' },
+                        bodySpacing: 8,
+                        padding: 12,
+                        usePointStyle: true,
+                        boxPadding: 4,
+                        borderColor: 'rgba(255,255,255,0.1)',
+                        borderWidth: 1,
+                        callbacks: {
+                            labelColor: (context) => ({
+                                borderColor: context.dataset.borderColor,
+                                backgroundColor: context.dataset.borderColor,
+                                borderWidth: 2,
+                                borderRadius: 2,
+                            }),
+                            label: (context) => {
+                                let label = ` ${context.dataset.label || ''}`;
+                                if (label) { label += ': '; }
+                                let value = context.parsed.y;
+                                if (context.dataset.yAxisID === 'y1') {
+                                    label += value + '%';
+                                } else {
+                                    label += value;
+                                }
+                                return label;
+                            },
+                            footer: (tooltipItems) => {
+                                const index = tooltipItems[0].dataIndex;
+                                return `\nTotal Active Users: ${data[index].totalUsers.toLocaleString()}`;
+                            }
+                        }
+                    },
+                    annotation: {
+                        annotations: annotations
+                    }
+                },
+                scales: {
+                    x: { 
+                        grid: { 
+                            display: false,
+                        },
+                        ticks: {
+                            padding: 15,
+                            font: {
+                                weight: '500'
+                            }
+                        }
+                    },
+                    y: {
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        beginAtZero: true,
+                        suggestedMax: suggestedMaxUsers,
+                        title: { display: true, text: 'User Count', font: { weight: 'bold' } },
+                        grid: { color: '#e2e8f0' } // slate-200
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'Retention Rate (%)', font: { weight: 'bold' } },
+                        ticks: {
+                            callback: function(value) { return value + '%'; }
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    const renderTransactionComparisonChart = (data) => {
         if (charts.transactionChart) charts.transactionChart.destroy();
         const transactionCtx = document.getElementById('transaction-chart').getContext('2d');
-        charts.transactionChart = new Chart(transactionCtx, { type: 'bar', data: { labels: [`Period 1`, `Period 2`], datasets: [{ label: 'Transaction Volume (Count)', data: [data.p1.count, data.p2.count], backgroundColor: '#fbbf24', borderColor: '#f59e0b', borderWidth: 1 }, { label: 'Transaction Value (₦)', data: [data.p1.amount, data.p2.amount], backgroundColor: '#60a5fa', borderColor: '#3b82f6', borderWidth: 1 }] }, options: { responsive: true, plugins: { legend: { position: 'top' }, title: { display: false }, tooltip: { callbacks: { label: function(context) { let label = context.dataset.label || ''; if (label) { label += ': '; } if (context.dataset.label.includes('Value')) { label += new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(context.parsed.y); } else { label += context.parsed.y; } return label; } } } }, scales: { y: { beginAtZero: true, ticks: { callback: function(value) { if (value >= 1000000) return (value / 1000000) + 'M'; if (value >= 1000) return (value / 1000) + 'K'; return value; } } } } } });
+
+        const labels = data.map(d => d.name);
+        const countData = data.map(d => d.totalTransactions);
+        const valueData = data.map(d => d.totalAmount);
+
+        const maxCount = Math.max(...countData);
+        const suggestedMaxCount = maxCount > 0 ? Math.ceil((maxCount * 1.25) / 100) * 100 : 100;
+        const maxValue = Math.max(...valueData);
+        const suggestedMaxValue = maxValue > 0 ? Math.ceil((maxValue * 1.25) / 100000) * 100000 : 100000;
+
+        charts.transactionChart = new Chart(transactionCtx, {
+            type: 'bar',
+            data: {
+                labels: labels,
+                datasets: [
+                    { label: 'Transaction Volume (Count)', data: countData, backgroundColor: '#fbbf24', yAxisID: 'y' },
+                    { label: 'Transaction Value (₦)', data: valueData, backgroundColor: '#60a5fa', yAxisID: 'y1' }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top' },
+                    title: { display: false },
+                    tooltip: {
+                        mode: 'index', intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (context.dataset.yAxisID === 'y1') {
+                                    label += new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(context.parsed.y);
+                                } else {
+                                    label += context.parsed.y.toLocaleString('en-US');
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    y: { type: 'linear', display: true, position: 'left', beginAtZero: true, suggestedMax: suggestedMaxCount, title: { display: true, text: 'Transaction Count' } },
+                    y1: {
+                        type: 'linear', display: true, position: 'right', beginAtZero: true, suggestedMax: suggestedMaxValue,
+                        grid: { drawOnChartArea: false },
+                        title: { display: true, text: 'Transaction Value (₦)' },
+                        ticks: {
+                            callback: function(value) {
+                                if (value >= 1000000) return (value / 1000000) + 'M';
+                                if (value >= 1000) return (value / 1000) + 'K';
+                                return value;
+                            }
+                        }
+                    }
+                }
+            }
+        });
     };
+
 
     // --- EVENT LISTENERS & INITIALIZATION ---
     fileInput1.addEventListener('change', () => handleFileUpload(fileInput1.files[0], 1));
@@ -898,7 +1223,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
 
     [uploadContainer1, uploadContainer2].forEach((container, index) => {
         container.addEventListener('dragover', (e) => { e.preventDefault(); if (!container.classList.contains('disabled')) container.classList.add('dragover'); });
-        container.addEventListener('dragleave', (e) => { e.preventDefault(); container.classList.remove('dragleave'); });
+        container.addEventListener('dragleave', (e) => { e.preventDefault(); container.classList.remove('dragover'); });
         container.addEventListener('drop', (e) => { e.preventDefault(); container.classList.remove('dragover'); if (!container.classList.contains('disabled')) { const files = e.dataTransfer.files; if (files.length) { const fileInput = index === 0 ? fileInput1 : fileInput2; fileInput.files = files; handleFileUpload(files[0], index + 1); } } });
     });
 

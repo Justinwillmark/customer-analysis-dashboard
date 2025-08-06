@@ -6,8 +6,9 @@
     <title>Pika Retention & Analysis Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/1.4.0/chartjs-plugin-annotation.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
-    <!-- pako.js is needed for creating the shareable monitor link -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pako/2.1.0/pako.min.js"></script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,7 +17,6 @@
 </head>
 <body class="text-slate-800">
 
-    <!-- NEW: Login Screen Overlay -->
     <div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center">
         <div class="login-card">
             <div class="login-icon">
@@ -38,7 +38,6 @@
     </div>
 
 
-    <!-- Loading Overlay -->
     <div id="loading-overlay" class="fixed inset-0 bg-slate-900 bg-opacity-30 z-40 hidden items-center justify-center">
         <div class="loader-card">
             <div class="loader"></div>
@@ -47,7 +46,6 @@
     </div>
 
 
-    <!-- Main app content is now hidden by default -->
     <div id="app" class="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto hidden">
 
         <header class="mb-8 text-center">
@@ -171,14 +169,18 @@
                 <div class="metric-card bg-white p-5 rounded-xl shadow-sm has-popup"><h3 class="text-sm font-medium text-slate-500">Total Active Users</h3><p id="total-users" class="metric-value text-3xl font-bold mt-1"></p><p id="total-when" class="text-xs text-slate-400 mt-1"></p><div id="total-popup" class="card-popup"></div></div>
             </div>
 
-            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+            <div class="grid grid-cols-1 gap-8 mb-8">
                 <div class="bg-white p-6 rounded-xl shadow-sm">
-                    <h3 class="font-semibold mb-4 text-center">User Overview</h3>
-                    <canvas id="user-chart"></canvas>
+                    <h3 class="font-semibold mb-4 text-center text-slate-700">User Overview & Retention (90-Day Trend)</h3>
+                    <div class="h-96">
+                        <canvas id="user-chart"></canvas>
+                    </div>
                 </div>
                 <div class="bg-white p-6 rounded-xl shadow-sm">
-                    <h3 class="font-semibold mb-4 text-center">Transaction Comparison</h3>
-                    <canvas id="transaction-chart"></canvas>
+                    <h3 class="font-semibold mb-4 text-center text-slate-700">Transaction Comparison (90-Day Trend)</h3>
+                     <div class="h-96">
+                        <canvas id="transaction-chart"></canvas>
+                    </div>
                 </div>
             </div>
 
@@ -230,7 +232,6 @@
         </div>
     </div>
 
-    <!-- Report Summary Modal -->
     <div id="report-modal-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
     <div id="report-modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-50 w-full max-w-lg p-6 hidden">
         <h2 class="text-lg font-bold mb-4 text-slate-800">Report Summary</h2>
