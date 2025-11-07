@@ -425,11 +425,13 @@ document.addEventListener('DOMContentLoaded', () => {
             const p1Data = dataPeriod1.find(u => u['Phone Number'] === phone);
             const details = churnDetailsMap.get(phone);
             return {
-                ...p1Data,
+                ...p1Data, // Data from period 1 (last active period)
+                ...details, // Enriched data from churn endpoint (like Referral Code, Store Name, etc.)
                 'Created Date': details ? details['Created Date'] : (p1Data ? p1Data['Created Date'] : null),
                 'Store Name': details ? details['Store Name'] : (p1Data ? p1Data['Store Name'] : 'N/A'),
                 'Store Address': details ? details['Store Address'] : (p1Data ? p1Data['Store Address'] : 'N/A'),
                 'LGA': details ? details['LGA'] : (p1Data ? p1Data['LGA'] : 'N/A'),
+                // Referral Code will be carried over from 'details' if it exists
             };
         });
         
@@ -649,7 +651,8 @@ Date & Time Stamp of Generated Report: ${timestamp}
     const expandChurnPopup = (container, title, data) => {
         container.classList.add('expanded');
 
-        const executiveOptions = `<option value="">Assign...</option>` + accountExecutives.map(name => `<option value="${name}">${name}</option>`).join('');
+        // This logic is now handled inline inside the data.map loop
+        // const executiveOptions = `<option value="">Assign...</option>` + accountExecutives.map(name => `<option value="${name}">${name}</option>`).join('');
 
         const managementHeader = document.createElement('div');
         managementHeader.className = 'management-header';
@@ -682,20 +685,38 @@ Date & Time Stamp of Generated Report: ${timestamp}
                     </tr>
                 </thead>
                 <tbody id="management-table-body">
-                    ${data.map(row => `
-                    <tr data-phone-row="${row['Phone Number']}">
-                        <td data-label="Name">${row['First Name']} ${row['Last Name']}</td>
-                        <td data-label="Phone">${row['Phone Number']}</td>
-                        <td data-label="Store Name">${row['Store Name'] || 'N/A'}</td>
-                        <td data-label="LGA">${row['LGA'] || 'N/A'}</td>
-                        <td data-label="Store Address">${row['Store Address'] || 'N/A'}</td>
-                        <td>${formatDate(row['Created Date'])}</td>
-                        <td>
-                            <select class="account-exec-select" data-phone="${row['Phone Number']}">
-                                ${executiveOptions}
-                            </select>
-                        </td>
-                    </tr>`).join('')}
+                    ${data.map(row => {
+                        const referralCode = row['Referral Code'];
+                        let referralOption = '';
+                        // Check if a referral code exists and if it's NOT already in the main AE list
+                        if (referralCode && !accountExecutives.includes(referralCode)) {
+                            referralOption = `<option value="${referralCode}" selected>${referralCode} (Referral)</option>`;
+                        }
+
+                        // Build the standard AE options
+                        const standardOptions = accountExecutives.map(name => {
+                            // If the referral code IS one of the AEs, select it
+                            const isSelected = (referralCode && name === referralCode) ? 'selected' : '';
+                            return `<option value="${name}" ${isSelected}>${name}</option>`;
+                        }).join('');
+
+                        return `
+                        <tr data-phone-row="${row['Phone Number']}">
+                            <td data-label="Name">${row['First Name']} ${row['Last Name']}</td>
+                            <td data-label="Phone">${row['Phone Number']}</td>
+                            <td data-label="Store Name">${row['Store Name'] || 'N/A'}</td>
+                            <td data-label="LGA">${row['LGA'] || 'N/A'}</td>
+                            <td data-label="Store Address">${row['Store Address'] || 'N/A'}</td>
+                            <td>${formatDate(row['Created Date'])}</td>
+                            <td>
+                                <select class="account-exec-select" data-phone="${row['Phone Number']}">
+                                    <option value="">Assign...</option>
+                                    ${referralOption}
+                                    ${standardOptions}
+                                </select>
+                            </td>
+                        </tr>`;
+                    }).join('')}
                 </tbody>
             </table>
         `;
@@ -739,11 +760,11 @@ Date & Time Stamp of Generated Report: ${timestamp}
                 assignments[select.dataset.phone] = select.value;
             });
 
-            const headers = "First Name\tLast Name\tPhone Number\tStore Name\tLGA\tStore Address\tLast Sale Date\tAccount Executive\n";
+            const headers = "First Name\tLast Name\tPhone Number\tReferral Code\tStore Name\tLGA\tStore Address\tLast Sale Date\tAccount Executive\n";
             const tsv = data.map(row => {
                 const executive = assignments[row['Phone Number']] || '';
                 const formattedDate = formatDate(row['Created Date']);
-                return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Store Name'] || ''}\t${row['LGA'] || ''}\t${row['Store Address'] || ''}\t${formattedDate === 'N/A' ? '' : formattedDate}\t${executive}`;
+                return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Referral Code'] || ''}\t${row['Store Name'] || ''}\t${row['LGA'] || ''}\t${row['Store Address'] || ''}\t${formattedDate === 'N/A' ? '' : formattedDate}\t${executive}`;
             }).join('\n');
 
             navigator.clipboard.writeText(headers + tsv).then(() => {
@@ -875,6 +896,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800">${row['First Name']}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800">${row['Last Name']}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${row['Phone Number']}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 hidden md:table-cell">${row['Referral Code'] || 'N/A'}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${row['LGA'] || 'N/A'}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500" title="${row['Store Name'] || ''}">${truncateText(row['Store Name'])}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500" title="${row['Store Address'] || ''}">${truncateText(row['Store Address'])}</td>
@@ -1254,11 +1276,13 @@ Date & Time Stamp of Generated Report: ${timestamp}
                 const phone = (row['Phone Number'] || '').toLowerCase();
                 const lga = (row['LGA'] || '').toLowerCase();
                 const store = (row['Store Name'] || '').toLowerCase();
+                const referral = (row['Referral Code'] || '').toLowerCase();
 
                 return fullName.includes(searchTerm) ||
                        phone.includes(searchTerm) ||
                        lga.includes(searchTerm) ||
-                       store.includes(searchTerm);
+                       store.includes(searchTerm) ||
+                       referral.includes(searchTerm);
             }
 
             return true;
@@ -1272,7 +1296,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
     exportBtn.addEventListener('click', () => {
         if (filteredData.length === 0) { alert('No data to export.'); return; }
         const csv = Papa.unparse(filteredData, {
-            columns: ['First Name', 'Last Name', 'Phone Number', 'LGA', 'Store Name', 'Store Address', 'Transaction Count', 'Total Amount']
+            columns: ['First Name', 'Last Name', 'Phone Number', 'Referral Code', 'LGA', 'Store Name', 'Store Address', 'Transaction Count', 'Total Amount']
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
