@@ -48,6 +48,22 @@ document.addEventListener('DOMContentLoaded', () => {
             const compressed = atob(hash).split('').map(c => c.charCodeAt(0));
             const jsonString = pako.inflate(compressed, { to: 'string' });
             monitorData = JSON.parse(jsonString);
+
+            // COMPATIBILITY CHECK:
+            // If data is in the new minified format (array of arrays under key 'u'), rehydrate it to standard objects.
+            if (monitorData.u) {
+                monitorData.assignedUsers = monitorData.u.map(row => ({
+                    'First Name': row[0],
+                    'Last Name': row[1],
+                    'Phone Number': row[2],
+                    'Store Name': row[3],
+                    'Store Address': row[4],
+                    'LGA': row[5],
+                    'Created Date': row[6],
+                    'assignedAE': row[7]
+                }));
+            }
+
             assignedUsers = monitorData.assignedUsers || [];
             return true;
         } catch (error) {

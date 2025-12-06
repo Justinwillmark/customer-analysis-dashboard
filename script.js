@@ -764,7 +764,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
             const tsv = data.map(row => {
                 const executive = assignments[row['Phone Number']] || '';
                 const formattedDate = formatDate(row['Created Date']);
-                return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Referral Code'] || ''}\t${row['Store Name'] || ''}\t${row['LGA'] || ''}\t${row['Store Address'] || ''}\t${formattedDate === 'N/A' ? '' : formattedDate}\t${executive}`;
+                return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Referral Code'] || ''}\t${row['Store Name'] || ''}\t${row['LGA'] || ''}\t${row['Store Address'] || ''}\t${formattedDate === 'N.A' ? '' : formattedDate}\t${executive}`;
             }).join('\n');
 
             navigator.clipboard.writeText(headers + tsv).then(() => {
@@ -861,9 +861,24 @@ Date & Time Stamp of Generated Report: ${timestamp}
             return;
         }
         try {
+            // Compress user data to Array of Arrays to save URL space
+            // Structure: [FirstName, LastName, Phone, StoreName, StoreAddr, LGA, CreatedDate, AE]
+            const minifiedUsers = assignedUsers.map(u => [
+                u['First Name'],
+                u['Last Name'],
+                u['Phone Number'],
+                u['Store Name'] || '',
+                u['Store Address'] || '',
+                u['LGA'] || '',
+                u['Created Date'],
+                u.assignedAE
+            ]);
+
             const monitorData = {
-                assignedUsers,
-                dueDate,
+                // 'u' for users, short key
+                u: minifiedUsers,
+                // Standard keys for top-level meta to keep logic simple
+                dueDate: dueDate,
                 creationDate: new Date().toISOString(),
                 reactivationStartDate: dateRange2.end,
                 dateRange1: dateRange1,
@@ -890,9 +905,10 @@ Date & Time Stamp of Generated Report: ${timestamp}
         dataTable.innerHTML = '';
         noResultsEl.classList.toggle('hidden', data.length > 0);
         const fragment = document.createDocumentFragment();
-        data.forEach(row => {
+        data.forEach((row, index) => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${index + 1}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800">${row['First Name']}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800">${row['Last Name']}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${row['Phone Number']}</td>
