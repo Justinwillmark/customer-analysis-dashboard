@@ -1,4 +1,4 @@
-document.addEventListener('DOMContentLoaded', () => {
+document.addEventListener('DOMContentLoaded', async () => {
     // DOM Elements
     const monitorInfo = document.getElementById('monitor-info');
     const churnPeriodInfo = document.getElementById('churn-period-info');
@@ -56,6 +56,103 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const toYYYYMMDD = (d) => d.toISOString().split('T')[0];
 
+    const fetchAndParse = async (url) => {
+        const response = await fetch(url);
+        if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+        const text = await response.text();
+        return new Promise((resolve, reject) => {
+            Papa.parse(text, {
+                header: true,
+                skipEmptyLines: true,
+                complete: (results) => resolve(results.data),
+                error: reject
+            });
+        });
+    };
+
+    const hydrateMonitorData = async () => {
+        monitorTable.innerHTML = `
+            <tr>
+                <td colspan="9" class="px-6 py-12 text-center text-gray-500">
+                    <div class="flex flex-col items-center justify-center">
+                        <svg class="animate-spin h-8 w-8 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <p class="font-medium text-lg">Retrieving monitor data...</p>
+                        <p class="text-sm mt-2 opacity-75">Fetching user details from source</p>
+                    </div>
+                </td>
+            </tr>`;
+
+        try {
+            const { api, d1, d2, a, aes, due, cr } = monitorData;
+
+            // Normalize URL
+            const retentionEndpoint = api.replace('/churn', '/retention');
+            
+            // Construct URLs for data reconstruction
+            const url1 = `${retentionEndpoint}?download=retained-user-stats&startDate=${d1.s}&endDate=${d1.e}`;
+            // We fetch P2 just to ensure churn logic holds if needed
+            const url2 = `${retentionEndpoint}?download=retained-user-stats&startDate=${d2.s}&endDate=${d2.e}`; 
+            const churnUrl = `${retentionEndpoint}?download=churned-users&startDate=${d1.s}&endDate=${d1.e}`;
+
+            // Fetch Data
+            const [p1Data, p2Data, churnDetailsData] = await Promise.all([
+                fetchAndParse(url1),
+                fetchAndParse(url2),
+                fetchAndParse(churnUrl)
+            ]);
+
+            const churnDetailsMap = new Map(churnDetailsData.map(u => [u['Phone Number'], u]));
+            
+            // 'a' is the assignment map: [[phoneNumber, aeIndex], ...]
+            // Create a map for fast lookup of assigned users
+            const assignedMap = new Map(a.map(([phone, aeIdx]) => [phone, aes[aeIdx]]));
+
+            monitorData.assignedUsers = [];
+
+            // Reconstruct the user objects
+            assignedMap.forEach((aeName, phone) => {
+                // Try to find the user in Period 1 data or Churn Details
+                const p1User = p1Data.find(u => u['Phone Number'] === phone);
+                const details = churnDetailsMap.get(phone);
+
+                if (p1User || details) {
+                    const user = {
+                        ...p1User, // Base data
+                        ...details, // Enriched data
+                        // Explicitly prioritize enriched details if available
+                        'First Name': details?.['First Name'] || p1User?.['First Name'] || 'Unknown',
+                        'Last Name': details?.['Last Name'] || p1User?.['Last Name'] || '',
+                        'Phone Number': phone,
+                        'Created Date': details?.['Created Date'] || p1User?.['Created Date'],
+                        'Store Name': details?.['Store Name'] || p1User?.['Store Name'] || 'N/A',
+                        'Store Address': details?.['Store Address'] || p1User?.['Store Address'] || 'N/A',
+                        'LGA': details?.['LGA'] || p1User?.['LGA'] || 'N/A',
+                        assignedAE: aeName
+                    };
+                    monitorData.assignedUsers.push(user);
+                }
+            });
+
+            assignedUsers = monitorData.assignedUsers;
+            
+            // Backfill legacy properties so the rest of the app works seamlessly
+            monitorData.dateRange2 = { start: d2.s, end: d2.e };
+            monitorData.apiBaseUrl = api;
+            monitorData.reactivationStartDate = d2.e;
+            monitorData.dueDate = due; // Fix for "NaN days"
+            monitorData.creationDate = cr; // Fix for missing creation date
+            
+            return true;
+        } catch (error) {
+            console.error('Hydration Error:', error);
+            monitorTable.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-red-600">Error loading monitor data: ${error.message}</td></tr>`;
+            return false;
+        }
+    };
+
     const decodeMonitorData = () => {
         try {
             const hash = window.location.hash.slice(1);
@@ -64,6 +161,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const jsonString = pako.inflate(compressed, { to: 'string' });
             monitorData = JSON.parse(jsonString);
 
+            // Version 2: Compact Link (Requires Hydration)
+            if (monitorData.v === 2) {
+                return true; 
+            }
+
+            // Version 1: Legacy (Full Payload)
             if (monitorData.u) {
                 monitorData.assignedUsers = monitorData.u.map(row => ({
                     'First Name': row[0],
@@ -75,9 +178,8 @@ document.addEventListener('DOMContentLoaded', () => {
                     'Created Date': row[6],
                     'assignedAE': row[7]
                 }));
+                assignedUsers = monitorData.assignedUsers || [];
             }
-
-            assignedUsers = monitorData.assignedUsers || [];
             return true;
         } catch (error) {
             console.error('Error decoding monitor data:', error);
@@ -87,12 +189,13 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const updateMonitorInfo = () => {
-        const creationDate = formatDate(monitorData.creationDate);
+        const creationDate = formatDate(monitorData.creationDate || monitorData.cr);
         const dueDate = formatDate(monitorData.dueDate);
         monitorInfo.textContent = `Monitor created on: ${creationDate} | Due Date: ${dueDate}`;
 
-        if (monitorData.dateRange2) {
-            const churnPeriodText = formatPeriodText(monitorData.dateRange2);
+        if (monitorData.dateRange2 || monitorData.d2) {
+            const range = monitorData.dateRange2 || { start: monitorData.d2.s, end: monitorData.d2.e };
+            const churnPeriodText = formatPeriodText(range);
             churnPeriodInfo.textContent = `Monitoring users who churned during the period of ${churnPeriodText}.`;
         }
     };
@@ -131,20 +234,16 @@ document.addEventListener('DOMContentLoaded', () => {
 
         // VISIBILITY LOGIC:
         if (isAgentView) {
-            // In Agent View:
-            // 1. If search input is empty, clear table, show placeholder, HIDE reactivated card.
-            // 2. If search input is active, show results, SHOW reactivated card for those results.
             if (searchInput.value.trim() === '') {
                  reactivatedCard.classList.add('hidden'); // Hide stats when no search
-                 monitorTable.innerHTML = '<tr><td colspan="9" class="px-6 py-12 text-center text-gray-500 italic text-lg">Use the search bar above to find a customer.</td></tr>';
+                 monitorTable.innerHTML = '<tr><td colspan="9" class="px-6 py-12 text-center text-gray-500 italic text-lg">Type in the search bar above to get results.</td></tr>';
                  return;
             } else {
                  reactivatedCard.classList.remove('hidden'); // Show stats for search results
                  updateReactivatedCount(usersToRender); // Update stats based on SEARCH results
             }
         } else {
-            // In Admin View:
-            // Always show reactivated card with GLOBAL stats
+            // Admin View:
             reactivatedCard.classList.remove('hidden');
             updateReactivatedCount(assignedUsers); 
         }
@@ -190,11 +289,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const handleSearch = () => {
         const searchTerm = searchInput.value.toLowerCase().trim();
         
-        // In Agent View, if search is empty, logic inside renderTable will handle the clearing and hiding.
-        // We pass an empty array or the full list? 
-        // We can pass the filtered list. If search is empty, filtered list is everything, 
-        // BUT renderTable will check searchInput.value and ignore the list if empty in Agent View.
-        
         const filteredUsers = assignedUsers.filter(user => {
             const fullName = `${user['First Name']} ${user['Last Name']}`.toLowerCase();
             const phone = (user['Phone Number'] || '').toLowerCase();
@@ -212,7 +306,11 @@ document.addEventListener('DOMContentLoaded', () => {
     };
 
     const refreshStatuses = async () => {
-        if (!monitorData.apiBaseUrl || !monitorData.reactivationStartDate) {
+        // Support both V1 structure and V2 structure
+        const apiBase = monitorData.apiBaseUrl || monitorData.api;
+        const startDateProp = monitorData.reactivationStartDate || (monitorData.d2 ? monitorData.d2.e : null);
+
+        if (!apiBase || !startDateProp) {
             alert('Missing API configuration. Cannot refresh statuses.');
             return;
         }
@@ -223,7 +321,7 @@ document.addEventListener('DOMContentLoaded', () => {
         loadingSpinner.classList.remove('hidden');
 
         try {
-            const reactivationStart = new Date(monitorData.reactivationStartDate + 'T00:00:00');
+            const reactivationStart = new Date(startDateProp + 'T00:00:00');
             const startDate = new Date(reactivationStart);
             startDate.setDate(startDate.getDate() - 1); 
             const today = new Date();
@@ -231,7 +329,7 @@ document.addEventListener('DOMContentLoaded', () => {
             endDate.setDate(endDate.getDate() + 1); 
             const startDateStr = toYYYYMMDD(startDate);
             const endDateStr = toYYYYMMDD(endDate);
-            const retentionEndpoint = monitorData.apiBaseUrl.replace('/churn', '/retention');
+            const retentionEndpoint = apiBase.replace('/churn', '/retention');
             const url = `${retentionEndpoint}?download=retained-user-stats&startDate=${startDateStr}&endDate=${endDateStr}`;
             
             const response = await fetch(url);
@@ -266,33 +364,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const updateViewMode = () => {
         if (isAgentView) {
-            // Agent View: 
-            // 1. Hide Admin specific controls
             copyAgentLinkBtn.classList.add('hidden');
             viewAsAdminBtn.classList.remove('hidden');
-            
-            // 2. Hide Reactivated Card (will be shown on search)
             reactivatedCard.classList.add('hidden');
-            
-            // 3. Ensure Time Remaining is visible
             timeRemainingCard.classList.remove('hidden');
-            
-            // 4. Clear table initially
             searchInput.value = '';
             renderTable([]);
         } else {
-            // Admin View:
-            // 1. Show Admin controls
             copyAgentLinkBtn.classList.remove('hidden');
             viewAsAdminBtn.classList.add('hidden');
-            
-            // 2. Show Reactivated Card (Global stats)
             reactivatedCard.classList.remove('hidden');
-            
-            // 3. Ensure Time Remaining is visible
             timeRemainingCard.classList.remove('hidden');
-            
-            // 4. Show all data
             renderTable(assignedUsers);
         }
     };
@@ -351,18 +433,29 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // Initialization
     if (decodeMonitorData()) {
-        updateMonitorInfo();
-        updateTimeRemaining();
-        updateViewMode(); // Set initial view based on URL param
-
-        // Refresh statuses on load
-        refreshStatuses();
+        // If V2, we need to hydrate data first
+        if (monitorData.v === 2) {
+            hydrateMonitorData().then(success => {
+                if (success) {
+                    updateMonitorInfo();
+                    updateTimeRemaining();
+                    updateViewMode();
+                    refreshStatuses();
+                    // Start timer only after successful load
+                    setInterval(updateTimeRemaining, 60000);
+                }
+            });
+        } else {
+            // Legacy load
+            updateMonitorInfo();
+            updateTimeRemaining();
+            updateViewMode(); 
+            refreshStatuses();
+            setInterval(updateTimeRemaining, 60000);
+        }
 
         // Event Listeners
         refreshBtn.addEventListener('click', refreshStatuses);
         searchInput.addEventListener('input', handleSearch);
-
-        // Update time remaining every minute
-        setInterval(updateTimeRemaining, 60000);
     }
 });

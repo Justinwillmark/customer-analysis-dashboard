@@ -861,29 +861,30 @@ Date & Time Stamp of Generated Report: ${timestamp}
             return;
         }
         try {
-            // Compress user data to Array of Arrays to save URL space
-            // Structure: [FirstName, LastName, Phone, StoreName, StoreAddr, LGA, CreatedDate, AE]
-            const minifiedUsers = assignedUsers.map(u => [
-                u['First Name'],
-                u['Last Name'],
-                u['Phone Number'],
-                u['Store Name'] || '',
-                u['Store Address'] || '',
-                u['LGA'] || '',
-                u['Created Date'],
-                u.assignedAE
-            ]);
+            // OPTIMIZATION (V2):
+            // Instead of storing full user objects (Name, Store, Address, etc.),
+            // we only store the reconstruction recipe:
+            // 1. API URL + Dates (to fetch the raw data)
+            // 2. Map of Phone Number -> Assigned AE Index
+            
+            // Extract unique AEs to index them
+            const uniqueAEs = [...new Set(assignedUsers.map(u => u.assignedAE).filter(Boolean))];
+            
+            // Map users to [PhoneNumber, AE_Index]
+            const assignments = assignedUsers.map(u => {
+                const aeIndex = uniqueAEs.indexOf(u.assignedAE);
+                return [u['Phone Number'], aeIndex];
+            });
 
             const monitorData = {
-                // 'u' for users, short key
-                u: minifiedUsers,
-                // Standard keys for top-level meta to keep logic simple
-                dueDate: dueDate,
-                creationDate: new Date().toISOString(),
-                reactivationStartDate: dateRange2.end,
-                dateRange1: dateRange1,
-                dateRange2: dateRange2,
-                apiBaseUrl: apiUrlInput.value.trim()
+                v: 2, // Version 2 flag
+                api: apiUrlInput.value.trim(),
+                d1: { s: dateRange1.start, e: dateRange1.end },
+                d2: { s: dateRange2.start, e: dateRange2.end },
+                due: dueDate,
+                cr: new Date().toISOString(),
+                aes: uniqueAEs,
+                a: assignments
             };
 
             const jsonString = JSON.stringify(monitorData);
