@@ -175,8 +175,22 @@ document.addEventListener('DOMContentLoaded', async () => {
         try {
             const hash = window.location.hash.slice(1);
             if (!hash) throw new Error('No monitor data found in URL.');
-            const compressed = atob(hash).split('').map(c => c.charCodeAt(0));
-            const jsonString = pako.inflate(compressed, { to: 'string' });
+            
+            // OPTIMIZED FIX: Convert to Uint8Array directly
+            // This prevents "undefined" return from pako on mobile browsers
+            const binaryString = atob(hash);
+            const len = binaryString.length;
+            const bytes = new Uint8Array(len);
+            for (let i = 0; i < len; i++) {
+                bytes[i] = binaryString.charCodeAt(i);
+            }
+            
+            const jsonString = pako.inflate(bytes, { to: 'string' });
+            
+            if (!jsonString) {
+                throw new Error('Decompression returned empty data.');
+            }
+
             monitorData = JSON.parse(jsonString);
 
             // Version 2: Compact Link (Requires Hydration)

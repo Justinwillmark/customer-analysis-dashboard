@@ -889,7 +889,14 @@ Date & Time Stamp of Generated Report: ${timestamp}
 
             const jsonString = JSON.stringify(monitorData);
             const compressed = pako.deflate(jsonString);
-            const base64String = btoa(String.fromCharCode.apply(null, compressed));
+
+            // UPDATED SAFE GENERATION: Avoid 'Maximum call stack size exceeded'
+            let binary = '';
+            const len = compressed.length;
+            for (let i = 0; i < len; i++) {
+                binary += String.fromCharCode(compressed[i]);
+            }
+            const base64String = btoa(binary);
 
             const url = new URL('monitor.html', window.location.href);
             url.hash = base64String;
