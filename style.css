@@ -562,10 +562,11 @@ body {
     cursor: not-allowed;
 }
 
+/* UPDATED: Removed padding to allow utility classes in HTML */
 .stat-card {
     background-color: white;
     border-radius: 0.75rem;
-    padding: 1.5rem;
+    /* padding: 1.5rem;  <-- REMOVED */
     box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
     transition: transform 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
 }
