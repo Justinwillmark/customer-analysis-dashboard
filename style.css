@@ -437,13 +437,18 @@ input:checked + .slider:before {
     box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.2);
 }
 
-
-.hidden {
-    display: none;
-}
-
 body {
   zoom: 80%;
+}
+
+@media (max-width: 640px) {
+    body {
+        zoom: 100%;
+    }
+    .container {
+        padding-left: 1rem;
+        padding-right: 1rem;
+    }
 }
 
 /* --- Login Screen Styles --- */

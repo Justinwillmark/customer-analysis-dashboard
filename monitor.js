@@ -6,6 +6,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const reactivatedProgress = document.getElementById('reactivated-progress');
     const timeRemainingEl = document.getElementById('time-remaining');
     const monitorTable = document.getElementById('monitor-table');
+    const monitorMobileList = document.getElementById('monitor-mobile-list'); 
     const refreshBtn = document.getElementById('refresh-btn');
     const refreshBtnText = document.getElementById('refresh-btn-text');
     const refreshIcon = document.getElementById('refresh-icon');
@@ -70,20 +71,37 @@ document.addEventListener('DOMContentLoaded', async () => {
         });
     };
 
+    const setTableLoadingState = (isLoading, errorMsg = null) => {
+        const html = isLoading 
+            ? `<tr><td colspan="9" class="px-6 py-12 text-center text-gray-500">
+                <div class="flex flex-col items-center justify-center">
+                    <svg class="animate-spin h-8 w-8 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                        <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <p class="font-medium text-lg">Retrieving monitor data...</p>
+                    <p class="text-sm mt-2 opacity-75">Fetching user details from source</p>
+                </div></td></tr>`
+            : (errorMsg ? `<tr><td colspan="9" class="px-6 py-4 text-center text-red-600">${errorMsg}</td></tr>` : '');
+
+        monitorTable.innerHTML = html;
+        
+        // Also update Mobile loading
+        if (isLoading) {
+            monitorMobileList.innerHTML = `<div class="flex flex-col items-center justify-center py-12 text-gray-500">
+                <svg class="animate-spin h-8 w-8 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p>Loading data...</p>
+            </div>`;
+        } else if (errorMsg) {
+            monitorMobileList.innerHTML = `<div class="text-center text-red-600 py-4">${errorMsg}</div>`;
+        }
+    };
+
     const hydrateMonitorData = async () => {
-        monitorTable.innerHTML = `
-            <tr>
-                <td colspan="9" class="px-6 py-12 text-center text-gray-500">
-                    <div class="flex flex-col items-center justify-center">
-                        <svg class="animate-spin h-8 w-8 text-blue-600 mb-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                        </svg>
-                        <p class="font-medium text-lg">Retrieving monitor data...</p>
-                        <p class="text-sm mt-2 opacity-75">Fetching user details from source</p>
-                    </div>
-                </td>
-            </tr>`;
+        setTableLoadingState(true);
 
         try {
             const { api, d1, d2, a, aes, due, cr } = monitorData;
@@ -148,7 +166,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return true;
         } catch (error) {
             console.error('Hydration Error:', error);
-            monitorTable.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-red-600">Error loading monitor data: ${error.message}</td></tr>`;
+            setTableLoadingState(false, `Error loading monitor data: ${error.message}`);
             return false;
         }
     };
@@ -183,7 +201,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             return true;
         } catch (error) {
             console.error('Error decoding monitor data:', error);
-            monitorTable.innerHTML = `<tr><td colspan="9" class="px-6 py-4 text-center text-red-600">Error loading monitor data: ${error.message}</td></tr>`;
+            setTableLoadingState(false, `Error loading monitor data: ${error.message}`);
             return false;
         }
     };
@@ -230,13 +248,22 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const renderTable = (usersToRender) => {
         monitorTable.innerHTML = '';
+        monitorMobileList.innerHTML = ''; // Clear mobile list
         noResults.classList.add('hidden');
 
         // VISIBILITY LOGIC:
         if (isAgentView) {
             if (searchInput.value.trim() === '') {
-                 reactivatedCard.classList.add('hidden'); // Hide stats when no search
-                 monitorTable.innerHTML = '<tr><td colspan="9" class="px-6 py-12 text-center text-gray-500 italic text-lg">Type in the search bar above to get results.</td></tr>';
+                 // REQ 2 (Agent): Don't hide, just reset to 0/0
+                 reactivatedCard.classList.remove('hidden'); 
+                 reactivatedCount.textContent = '0/0';
+                 reactivatedProgress.style.width = '0%';
+                 
+                 const emptyMsg = `
+                    <tr><td colspan="9" class="px-6 py-12 text-center text-gray-500 italic text-lg">Type in the search bar above to get results.</td></tr>
+                 `;
+                 monitorTable.innerHTML = emptyMsg;
+                 monitorMobileList.innerHTML = `<div class="text-center text-gray-500 py-12 italic text-lg">Type in the search bar above to get results.</div>`;
                  return;
             } else {
                  reactivatedCard.classList.remove('hidden'); // Show stats for search results
@@ -245,20 +272,30 @@ document.addEventListener('DOMContentLoaded', async () => {
         } else {
             // Admin View:
             reactivatedCard.classList.remove('hidden');
-            updateReactivatedCount(assignedUsers); 
+            // REQ 2 (Admin): Use filtered results (usersToRender) instead of full list (assignedUsers)
+            // so the stats reflect what is currently on screen (Search/Filter results).
+            updateReactivatedCount(usersToRender); 
         }
 
         // Standard empty state handling for search results
         if (usersToRender.length === 0) {
             if (searchInput.value) {
                 noResults.classList.remove('hidden');
+                monitorMobileList.innerHTML = ''; // No results on mobile too
             } else {
-                monitorTable.innerHTML = '<tr><td colspan="9" class="px-6 py-8 text-center text-gray-500">No assigned users.</td></tr>';
+                const noUsersMsg = '<tr><td colspan="9" class="px-6 py-8 text-center text-gray-500">No assigned users.</td></tr>';
+                monitorTable.innerHTML = noUsersMsg;
+                monitorMobileList.innerHTML = `<div class="text-center text-gray-500 py-8">No assigned users.</div>`;
             }
             return;
         }
 
+        // Render Desktop and Mobile Views
+        const fragment = document.createDocumentFragment();
+        const mobileFragment = document.createDocumentFragment();
+
         usersToRender.forEach((user, index) => {
+            // 1. Desktop Row
             const tr = document.createElement('tr');
             tr.className = 'transition-colors duration-500';
 
@@ -282,8 +319,56 @@ document.addEventListener('DOMContentLoaded', async () => {
                 <td class="px-6 py-4 text-sm text-gray-700 font-semibold">${user.assignedAE}</td>
                 <td class="px-6 py-4 text-sm font-medium text-center">${statusBadge}</td>
             `;
-            monitorTable.appendChild(tr);
+            fragment.appendChild(tr);
+
+            // 2. Mobile Card (REQ 3 - Smaller/Compact Cards)
+            const card = document.createElement('div');
+            // reduced padding p-3, reduced gap-2
+            card.className = `bg-white p-3 rounded-lg shadow-sm border border-gray-100 flex flex-col gap-2 ${isReactivated ? 'border-green-200 bg-green-50' : ''}`;
+            
+            // Mobile formatting - Smaller button/text for phone
+            const phoneLink = user['Phone Number'] 
+                ? `<a href="tel:${user['Phone Number']}" class="inline-flex items-center text-blue-600 font-medium hover:text-blue-800 text-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
+                    Call
+                   </a>` 
+                : '<span class="text-xs text-gray-400">No Phone</span>';
+
+            // Smaller headers (text-base) and details (text-xs)
+            card.innerHTML = `
+                <div class="flex justify-between items-start">
+                    <div class="overflow-hidden">
+                        <h3 class="font-bold text-gray-900 text-base truncate">${user['First Name']} ${user['Last Name']}</h3>
+                        <div class="text-xs text-gray-500 mt-0.5 truncate">${user['Store Name'] || 'No Store Name'}</div>
+                    </div>
+                    ${statusBadge}
+                </div>
+                
+                <div class="grid grid-cols-2 gap-1 text-xs mt-1">
+                    <div class="text-gray-500">
+                        <span class="block text-[10px] uppercase text-gray-400 font-semibold">LGA</span>
+                        ${user['LGA'] || '-'}
+                    </div>
+                    <div class="text-gray-500">
+                         <span class="block text-[10px] uppercase text-gray-400 font-semibold">Last Sale</span>
+                         ${formatDate(user['Created Date'])}
+                    </div>
+                </div>
+
+                <div class="text-xs text-gray-600 border-t border-gray-100 pt-2 mt-1 truncate">
+                     ${user['Store Address'] || 'N/A'}
+                </div>
+
+                <div class="flex justify-between items-center pt-1 mt-1">
+                    ${phoneLink}
+                    <div class="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded border border-gray-100">AE: ${user.assignedAE}</div>
+                </div>
+            `;
+            mobileFragment.appendChild(card);
         });
+        
+        monitorTable.appendChild(fragment);
+        monitorMobileList.appendChild(mobileFragment);
     };
 
     const handleSearch = () => {
@@ -363,11 +448,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const updateViewMode = () => {
+        // REQ 3: Explicitly show elements here. They are hidden by default in HTML.
         if (isAgentView) {
             copyAgentLinkBtn.classList.add('hidden');
             viewAsAdminBtn.classList.remove('hidden');
-            reactivatedCard.classList.add('hidden');
-            timeRemainingCard.classList.remove('hidden');
+            // Reactivated card visibility is now handled by renderTable
+            timeRemainingCard.classList.remove('hidden'); 
             searchInput.value = '';
             renderTable([]);
         } else {
@@ -435,11 +521,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (decodeMonitorData()) {
         // If V2, we need to hydrate data first
         if (monitorData.v === 2) {
+            // NOTE: updateViewMode called AFTER hydration to prevent flash of empty tables/wrong UI
             hydrateMonitorData().then(success => {
                 if (success) {
                     updateMonitorInfo();
                     updateTimeRemaining();
-                    updateViewMode();
+                    updateViewMode(); // Call this here for V2 to respect loaded data
                     refreshStatuses();
                     // Start timer only after successful load
                     setInterval(updateTimeRemaining, 60000);
