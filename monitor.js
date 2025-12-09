@@ -340,9 +340,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             // reduced padding p-3, reduced gap-2
             card.className = `bg-white p-3 rounded-lg shadow-sm border border-gray-100 flex flex-col gap-2 ${isReactivated ? 'border-green-200 bg-green-50' : ''}`;
             
+            // Format phone number for dialing logic (234 -> 0)
+            let dialNumber = user['Phone Number'] || '';
+            if (dialNumber.toString().startsWith('234')) {
+                dialNumber = '0' + dialNumber.toString().substring(3);
+            }
+
             // Mobile formatting - Smaller button/text for phone
             const phoneLink = user['Phone Number'] 
-                ? `<a href="tel:${user['Phone Number']}" class="inline-flex items-center text-blue-600 font-medium hover:text-blue-800 text-sm">
+                ? `<a href="tel:${dialNumber}" class="inline-flex items-center text-blue-600 font-medium hover:text-blue-800 text-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
                     Call
                    </a>` 
