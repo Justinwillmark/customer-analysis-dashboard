@@ -25,9 +25,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const adminLoginError = document.getElementById('admin-login-error');
     const cancelLoginBtn = document.getElementById('cancel-login-btn');
 
+    // New Filter Buttons
+    const filterBtnAll = document.getElementById('filter-btn-all');
+    const filterBtnAe = document.getElementById('filter-btn-ae');
+    const filterBtnMerchant = document.getElementById('filter-btn-merchant');
+
     // State
     let monitorData = null;
     let assignedUsers = [];
+    let searchFilter = 'all'; // 'all', 'ae', 'merchant'
     
     // Check URL parameters for view mode
     const urlParams = new URLSearchParams(window.location.search);
@@ -400,15 +406,65 @@ document.addEventListener('DOMContentLoaded', async () => {
             const storeName = (user['Store Name'] || '').toLowerCase();
             const lga = (user['LGA'] || '').toLowerCase();
             const ae = (user.assignedAE || '').toLowerCase();
+            const address = (user['Store Address'] || '').toLowerCase();
 
-            return fullName.includes(searchTerm) ||
-                   phone.includes(searchTerm) ||
-                   storeName.includes(searchTerm) ||
-                   lga.includes(searchTerm) ||
-                   ae.includes(searchTerm);
+            if (searchFilter === 'ae') {
+                // Filter only by AE name
+                return ae.includes(searchTerm);
+            } else if (searchFilter === 'merchant') {
+                // Filter only by Merchant details
+                return fullName.includes(searchTerm) ||
+                       phone.includes(searchTerm) ||
+                       storeName.includes(searchTerm) ||
+                       lga.includes(searchTerm) ||
+                       address.includes(searchTerm);
+            } else {
+                // Default 'all': Search everything
+                return fullName.includes(searchTerm) ||
+                       phone.includes(searchTerm) ||
+                       storeName.includes(searchTerm) ||
+                       lga.includes(searchTerm) ||
+                       ae.includes(searchTerm);
+            }
         });
         renderTable(filteredUsers);
     };
+
+    // Filter Button Logic
+    const updateFilterButtons = () => {
+        // Active: Blue background, white text, shadow, hover effect
+        // Inactive: White background, gray text, border, hover effect
+        
+        const setActive = (btn) => {
+            btn.className = "flex-1 px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-md bg-blue-600 text-white border border-transparent tracking-wide hover:bg-blue-700";
+        };
+
+        const setInactive = (btn) => {
+            btn.className = "flex-1 px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-sm bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 tracking-wide";
+        };
+
+        if (searchFilter === 'all') setActive(filterBtnAll); else setInactive(filterBtnAll);
+        if (searchFilter === 'ae') setActive(filterBtnAe); else setInactive(filterBtnAe);
+        if (searchFilter === 'merchant') setActive(filterBtnMerchant); else setInactive(filterBtnMerchant);
+    };
+
+    filterBtnAll.addEventListener('click', () => {
+        searchFilter = 'all';
+        updateFilterButtons();
+        handleSearch();
+    });
+
+    filterBtnAe.addEventListener('click', () => {
+        searchFilter = 'ae';
+        updateFilterButtons();
+        handleSearch();
+    });
+
+    filterBtnMerchant.addEventListener('click', () => {
+        searchFilter = 'merchant';
+        updateFilterButtons();
+        handleSearch();
+    });
 
     const refreshStatuses = async () => {
         // Support both V1 structure and V2 structure
