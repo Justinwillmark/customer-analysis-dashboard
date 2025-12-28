@@ -615,8 +615,8 @@ Date & Time Stamp of Generated Report: ${timestamp}
                     return `${row['First Name']}\t${row['Last Name']}\t${row['Phone Number']}\t${row['Store Name'] || ''}\t${row['Store Address'] || ''}\t${formattedDate === 'N/A' ? '' : formattedDate}\t${row['Transaction Count']}`
                 }).join('\n');
             } else {
-                headers = "First Name\tLast Name\tTransaction Count\tPhone Number\n";
-                tsv = data.map(row => `${row['First Name']}\t${row['Last Name']}\t${row['Transaction Count']}\t${row['Phone Number']}`).join('\n');
+                headers = "First Name\tLast Name\tTransaction Count\tPhone Number\tReferral Code\n";
+                tsv = data.map(row => `${row['First Name']}\t${row['Last Name']}\t${row['Transaction Count']}\t${row['Phone Number']}\t${row['Referral Code'] || ''}`).join('\n');
             }
             navigator.clipboard.writeText(headers + tsv).then(() => {
                 copyButton.textContent = 'Copied!';
@@ -639,6 +639,16 @@ Date & Time Stamp of Generated Report: ${timestamp}
                 expandChurnPopup(container, title, data);
             });
             buttonsWrapper.appendChild(viewAllBtn);
+        } else if (popupId === 'retained-popup') {
+             // --- NEW: Add AE Retention View Button ---
+             const viewAeBtn = document.createElement('button');
+             viewAeBtn.textContent = 'AE Analysis';
+             viewAeBtn.className = 'popup-action-btn';
+             viewAeBtn.addEventListener('click', (e) => {
+                 e.stopPropagation();
+                 expandRetentionPopup(container, title, data);
+             });
+             buttonsWrapper.appendChild(viewAeBtn);
         }
 
         buttonsWrapper.appendChild(copyButton);
@@ -646,6 +656,178 @@ Date & Time Stamp of Generated Report: ${timestamp}
 
         container.innerHTML = tableHTML;
         container.appendChild(footer);
+    };
+
+    // --- NEW FUNCTION: AE RETENTION ANALYSIS ---
+    const expandRetentionPopup = (container, title, data) => {
+        container.classList.add('expanded');
+        
+        // 1. Map Period 1 data for comparison (Performance across periods)
+        // We want to see if the user grew or declined in volume compared to the previous period
+        const p1Map = new Map();
+        if (dataPeriod1 && dataPeriod1.length > 0) {
+            dataPeriod1.forEach(u => p1Map.set(u['Phone Number'], u));
+        }
+
+        // 2. Aggregate Data by AE (Referral Code)
+        const aeStats = {};
+        
+        data.forEach(user => {
+            // Normalize AE Name
+            const ae = user['Referral Code'] && user['Referral Code'].trim() !== "" 
+                       ? user['Referral Code'] 
+                       : "Unassigned/Direct";
+            
+            if (!aeStats[ae]) {
+                aeStats[ae] = { 
+                    name: ae, 
+                    users: 0, 
+                    txns: 0, 
+                    amount: 0,
+                    p1Amount: 0 // To track volume from previous period for retained users
+                };
+            }
+            
+            aeStats[ae].users++;
+            aeStats[ae].txns += (user['Transaction Count'] || 0);
+            const currentAmount = (user['Total Amount'] || 0);
+            aeStats[ae].amount += currentAmount;
+            
+            // Get P1 stats if available
+            const p1User = p1Map.get(user['Phone Number']);
+            if (p1User) {
+                aeStats[ae].p1Amount += (p1User['Total Amount'] || 0);
+            }
+        });
+
+        // 3. Convert to Array and Sort by Total Amount (Performance)
+        const sortedStats = Object.values(aeStats).sort((a, b) => b.amount - a.amount);
+        const totalSystemAmount = sortedStats.reduce((sum, item) => sum + item.amount, 0);
+
+        // 4. Construct Header
+        const managementHeader = document.createElement('div');
+        managementHeader.className = 'management-header';
+        managementHeader.innerHTML = `
+            <div class="flex flex-col">
+                <h3 class="management-title">AE Retention View</h3>
+                <p class="text-xs text-slate-500">Breakdown of retained merchants by Account Executive.</p>
+            </div>
+            <button class="fullscreen-toggle-btn" title="Toggle Fullscreen">
+                <svg id="maximize-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                </svg>
+                <svg id="minimize-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 hidden">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
+                </svg>
+            </button>
+        `;
+
+        // 5. Construct Table
+        const tableContainer = document.createElement('div');
+        tableContainer.className = 'popup-table-container';
+        
+        tableContainer.innerHTML = `
+            <table class="popup-table">
+                <thead>
+                    <tr>
+                        <th>AE Name / Referral</th>
+                        <th class="text-center">Retained Users</th>
+                        <th class="text-right">Total Sales (P2)</th>
+                        <th class="text-right">vs Prior Period</th>
+                        <th class="text-center">Txn Count</th>
+                        <th class="text-right">% of Total Vol.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    ${sortedStats.map(stat => {
+                        const percentOfTotal = totalSystemAmount > 0 ? (stat.amount / totalSystemAmount * 100).toFixed(1) : 0;
+                        const growth = stat.p1Amount > 0 ? ((stat.amount - stat.p1Amount) / stat.p1Amount * 100) : 0;
+                        const growthClass = growth >= 0 ? 'text-green-600' : 'text-red-600';
+                        const growthIcon = growth >= 0 ? '▲' : '▼';
+                        const growthStr = stat.p1Amount > 0 ? `${growthIcon} ${Math.abs(growth).toFixed(1)}%` : '-';
+                        
+                        return `
+                        <tr class="hover:bg-slate-100 transition-colors cursor-default">
+                            <td class="font-medium text-slate-700">${stat.name}</td>
+                            <td class="text-center font-semibold">${stat.users}</td>
+                            <td class="text-right font-mono text-slate-600">${new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(stat.amount)}</td>
+                            <td class="text-right text-xs font-semibold ${growthClass}">${growthStr}</td>
+                            <td class="text-center text-slate-500">${stat.txns}</td>
+                            <td class="text-right text-xs text-slate-400">${percentOfTotal}%</td>
+                        </tr>`;
+                    }).join('')}
+                </tbody>
+            </table>
+        `;
+
+        // 6. Construct Footer
+        const footer = document.createElement('div');
+        footer.className = 'popup-footer';
+        
+        const totalText = document.createElement('span');
+        totalText.textContent = `Tracking ${sortedStats.length} AEs/Referrers.`;
+
+        const buttonsWrapper = document.createElement('div');
+        buttonsWrapper.className = 'flex items-center gap-2';
+
+        const collapseBtn = document.createElement('button');
+        collapseBtn.textContent = 'Collapse';
+        collapseBtn.className = 'popup-action-btn';
+        collapseBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (container.classList.contains('fullscreen')) {
+                container.classList.remove('fullscreen');
+                document.body.classList.remove('fullscreen-active');
+            }
+            createPopupTable('retained-popup', title, data);
+        });
+
+        const copyButton = document.createElement('button');
+        copyButton.textContent = 'Copy Analysis';
+        copyButton.className = 'popup-copy-button';
+        copyButton.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const headers = "AE Name\tRetained Users\tTotal Sales (P2)\tPrevious Sales (P1)\tTransaction Count\n";
+            const tsv = sortedStats.map(stat => {
+                return `${stat.name}\t${stat.users}\t${stat.amount}\t${stat.p1Amount}\t${stat.txns}`;
+            }).join('\n');
+
+            navigator.clipboard.writeText(headers + tsv).then(() => {
+                copyButton.textContent = 'Copied!';
+                copyButton.classList.add('copied');
+                setTimeout(() => { copyButton.textContent = 'Copy Analysis'; copyButton.classList.remove('copied'); }, 2000);
+            });
+        });
+
+        footer.appendChild(totalText);
+        buttonsWrapper.appendChild(collapseBtn);
+        buttonsWrapper.appendChild(copyButton);
+        footer.appendChild(buttonsWrapper);
+
+        // 7. Assemble
+        container.innerHTML = '';
+        container.appendChild(managementHeader);
+        container.appendChild(tableContainer);
+        container.appendChild(footer);
+
+        // 8. Fullscreen Logic (Reused)
+        const fullscreenBtn = container.querySelector('.fullscreen-toggle-btn');
+        const freezeBodyScroll = () => document.body.classList.add('fullscreen-active');
+        const unfreezeBodyScroll = () => document.body.classList.remove('fullscreen-active');
+        
+        fullscreenBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const isNowFullscreen = container.classList.toggle('fullscreen');
+            
+            container.querySelector('#maximize-icon').classList.toggle('hidden');
+            container.querySelector('#minimize-icon').classList.toggle('hidden');
+
+            if (isNowFullscreen) {
+                freezeBodyScroll();
+            } else {
+                unfreezeBodyScroll();
+            }
+        });
     };
 
     const expandChurnPopup = (container, title, data) => {
