@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const monitorInfo = document.getElementById('monitor-info');
     const churnPeriodInfo = document.getElementById('churn-period-info');
     const reactivatedCount = document.getElementById('reactivated-count');
+    const reactivatedCardTitle = document.getElementById('reactivated-card-title');
     const reactivatedProgress = document.getElementById('reactivated-progress');
     const timeRemainingEl = document.getElementById('time-remaining');
     const monitorTable = document.getElementById('monitor-table');
@@ -25,15 +26,18 @@ document.addEventListener('DOMContentLoaded', async () => {
     const adminLoginError = document.getElementById('admin-login-error');
     const cancelLoginBtn = document.getElementById('cancel-login-btn');
 
-    // New Filter Buttons
+    // Filter Buttons
     const filterBtnAll = document.getElementById('filter-btn-all');
     const filterBtnAe = document.getElementById('filter-btn-ae');
     const filterBtnMerchant = document.getElementById('filter-btn-merchant');
+    const filterBtnActivity = document.getElementById('filter-btn-activity');
 
     // State
     let monitorData = null;
     let assignedUsers = [];
+    let activePeriodData = []; // Stores full list of active users from API
     let searchFilter = 'all'; // 'all', 'ae', 'merchant'
+    let viewMode = 'monitor'; // 'monitor' | 'activity'
     
     // Check URL parameters for view mode
     const urlParams = new URLSearchParams(window.location.search);
@@ -258,12 +262,20 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const updateReactivatedCount = (usersSubset) => {
-        const reactivated = usersSubset.filter(u => u.status === 'Reactivated').length;
-        const total = usersSubset.length;
-        reactivatedCount.textContent = `${reactivated}/${total}`;
-        
-        const percentage = total > 0 ? (reactivated / total) * 100 : 0;
-        reactivatedProgress.style.width = `${percentage}%`;
+        if (viewMode === 'activity') {
+            reactivatedCardTitle.textContent = "Total Active";
+            const total = usersSubset.length;
+            reactivatedCount.textContent = total;
+            reactivatedProgress.style.width = '100%';
+        } else {
+            reactivatedCardTitle.textContent = "Users Reactivated";
+            const reactivated = usersSubset.filter(u => u.status === 'Reactivated').length;
+            const total = usersSubset.length;
+            reactivatedCount.textContent = `${reactivated}/${total}`;
+            
+            const percentage = total > 0 ? (reactivated / total) * 100 : 0;
+            reactivatedProgress.style.width = `${percentage}%`;
+        }
     };
 
     const renderTable = (usersToRender) => {
@@ -272,9 +284,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         noResults.classList.add('hidden');
 
         // VISIBILITY LOGIC:
-        if (isAgentView) {
+        if (isAgentView && viewMode === 'monitor') {
             if (searchInput.value.trim() === '') {
-                 // REQ 2 (Agent): Don't hide, just reset to 0/0
                  reactivatedCard.classList.remove('hidden'); 
                  reactivatedCount.textContent = '0/0';
                  reactivatedProgress.style.width = '0%';
@@ -290,10 +301,8 @@ document.addEventListener('DOMContentLoaded', async () => {
                  updateReactivatedCount(usersToRender); // Update stats based on SEARCH results
             }
         } else {
-            // Admin View:
+            // Admin View OR Activity Mode:
             reactivatedCard.classList.remove('hidden');
-            // REQ 2 (Admin): Use filtered results (usersToRender) instead of full list (assignedUsers)
-            // so the stats reflect what is currently on screen (Search/Filter results).
             updateReactivatedCount(usersToRender); 
         }
 
@@ -303,9 +312,9 @@ document.addEventListener('DOMContentLoaded', async () => {
                 noResults.classList.remove('hidden');
                 monitorMobileList.innerHTML = ''; // No results on mobile too
             } else {
-                const noUsersMsg = '<tr><td colspan="9" class="px-6 py-8 text-center text-gray-500">No assigned users.</td></tr>';
+                const noUsersMsg = '<tr><td colspan="9" class="px-6 py-8 text-center text-gray-500">No data available.</td></tr>';
                 monitorTable.innerHTML = noUsersMsg;
-                monitorMobileList.innerHTML = `<div class="text-center text-gray-500 py-8">No assigned users.</div>`;
+                monitorMobileList.innerHTML = `<div class="text-center text-gray-500 py-8">No data available.</div>`;
             }
             return;
         }
@@ -319,14 +328,26 @@ document.addEventListener('DOMContentLoaded', async () => {
             const tr = document.createElement('tr');
             tr.className = 'transition-colors duration-500';
 
-            const isReactivated = user.status === 'Reactivated';
-            if (isReactivated) {
-                tr.classList.add('reactivated-row');
+            // Determine Status Styling
+            let statusBadge = '';
+            if (viewMode === 'activity') {
+                if (user.status === 'Reactivation-based') {
+                    tr.classList.add('reactivated-row');
+                    statusBadge = `<span class="status-badge status-reactivated">Reactivation-based</span>`;
+                } else {
+                    // Organic Active
+                    tr.classList.add('onboarded-row'); // Using existing light blue style or new one
+                    statusBadge = `<span class="status-badge status-onboarded">Organic Active</span>`;
+                }
+            } else {
+                const isReactivated = user.status === 'Reactivated';
+                if (isReactivated) {
+                    tr.classList.add('reactivated-row');
+                }
+                statusBadge = isReactivated
+                    ? `<span class="status-badge status-reactivated">Reactivated</span>`
+                    : `<span class="status-badge status-churned">Churned</span>`;
             }
-            
-            const statusBadge = isReactivated
-                ? `<span class="status-badge status-reactivated">Reactivated</span>`
-                : `<span class="status-badge status-churned">Churned</span>`;
 
             tr.innerHTML = `
                 <td class="px-6 py-4 text-sm text-gray-700">${index + 1}</td>
@@ -341,10 +362,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             `;
             fragment.appendChild(tr);
 
-            // 2. Mobile Card (REQ 3 - Smaller/Compact Cards)
+            // 2. Mobile Card
             const card = document.createElement('div');
-            // reduced padding p-3, reduced gap-2
-            card.className = `bg-white p-3 rounded-lg shadow-sm border border-gray-100 flex flex-col gap-2 ${isReactivated ? 'border-green-200 bg-green-50' : ''}`;
+            let cardClasses = `bg-white p-3 rounded-lg shadow-sm border border-gray-100 flex flex-col gap-2`;
+            
+            if (viewMode === 'activity') {
+                 if (user.status === 'Reactivation-based') cardClasses += ' border-green-200 bg-green-50';
+                 else cardClasses += ' border-blue-200 bg-blue-50';
+            } else {
+                 if (user.status === 'Reactivated') cardClasses += ' border-green-200 bg-green-50';
+            }
+            
+            card.className = cardClasses;
             
             // Format phone number for dialing logic (234 -> 0)
             let dialNumber = user['Phone Number'] || '';
@@ -352,7 +381,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                 dialNumber = '0' + dialNumber.toString().substring(3);
             }
 
-            // Mobile formatting - Smaller button/text for phone
             const phoneLink = user['Phone Number'] 
                 ? `<a href="tel:${dialNumber}" class="inline-flex items-center text-blue-600 font-medium hover:text-blue-800 text-sm">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" /></svg>
@@ -360,7 +388,6 @@ document.addEventListener('DOMContentLoaded', async () => {
                    </a>` 
                 : '<span class="text-xs text-gray-400">No Phone</span>';
 
-            // Smaller headers (text-base) and details (text-xs)
             card.innerHTML = `
                 <div class="flex justify-between items-start">
                     <div class="overflow-hidden">
@@ -400,74 +427,130 @@ document.addEventListener('DOMContentLoaded', async () => {
     const handleSearch = () => {
         const searchTerm = searchInput.value.toLowerCase().trim();
         
-        const filteredUsers = assignedUsers.filter(user => {
-            const fullName = `${user['First Name']} ${user['Last Name']}`.toLowerCase();
-            const phone = (user['Phone Number'] || '').toLowerCase();
-            const storeName = (user['Store Name'] || '').toLowerCase();
-            const lga = (user['LGA'] || '').toLowerCase();
-            const ae = (user.assignedAE || '').toLowerCase();
-            const address = (user['Store Address'] || '').toLowerCase();
+        let results = [];
 
-            if (searchFilter === 'ae') {
-                // Filter only by AE name
-                return ae.includes(searchTerm);
-            } else if (searchFilter === 'merchant') {
-                // Filter only by Merchant details
-                return fullName.includes(searchTerm) ||
-                       phone.includes(searchTerm) ||
-                       storeName.includes(searchTerm) ||
-                       lga.includes(searchTerm) ||
-                       address.includes(searchTerm);
-            } else {
-                // Default 'all': Search everything
-                return fullName.includes(searchTerm) ||
-                       phone.includes(searchTerm) ||
-                       storeName.includes(searchTerm) ||
-                       lga.includes(searchTerm) ||
-                       ae.includes(searchTerm);
+        if (viewMode === 'activity') {
+            // --- Activity View Logic ---
+            if (activePeriodData.length === 0) {
+                // If data hasn't loaded yet, try to refresh or show empty
+                if (!loadingSpinner.classList.contains('hidden')) return; // Still loading
             }
-        });
-        renderTable(filteredUsers);
+            
+            // Determine the "Target AE" context
+            // 1. If searching, use search term against Referral Code
+            // 2. If Agent View (and no search), use the Agent's name derived from assignments
+            let targetAE = searchTerm;
+            if (!targetAE && isAgentView && assignedUsers.length > 0) {
+                 targetAE = assignedUsers[0].assignedAE.toLowerCase();
+            }
+
+            if (!targetAE) {
+                // Admin mode with no search -> Show nothing or all? 
+                // Matches standard behavior: Admin sees nothing until search
+                renderTable([]); 
+                return;
+            }
+
+            // Create a set of phone numbers that are on the monitor list (assignedUsers)
+            const monitoredPhoneNumbers = new Set(assignedUsers.map(u => u['Phone Number']));
+
+            results = activePeriodData.filter(user => {
+                const referral = (user['Referral Code'] || '').toLowerCase();
+                // Check if this active user belongs to the target AE
+                return referral.includes(targetAE);
+            }).map(user => {
+                const isMonitored = monitoredPhoneNumbers.has(user['Phone Number']);
+                return {
+                    ...user,
+                    assignedAE: user['Referral Code'], // For display consistency
+                    status: isMonitored ? 'Reactivation-based' : 'Organic Active'
+                };
+            });
+
+        } else {
+            // --- Monitor View Logic (Standard) ---
+            results = assignedUsers.filter(user => {
+                const fullName = `${user['First Name']} ${user['Last Name']}`.toLowerCase();
+                const phone = (user['Phone Number'] || '').toLowerCase();
+                const storeName = (user['Store Name'] || '').toLowerCase();
+                const lga = (user['LGA'] || '').toLowerCase();
+                const ae = (user.assignedAE || '').toLowerCase();
+                const address = (user['Store Address'] || '').toLowerCase();
+
+                if (searchFilter === 'ae') {
+                    return ae.includes(searchTerm);
+                } else if (searchFilter === 'merchant') {
+                    return fullName.includes(searchTerm) ||
+                           phone.includes(searchTerm) ||
+                           storeName.includes(searchTerm) ||
+                           lga.includes(searchTerm) ||
+                           address.includes(searchTerm);
+                } else {
+                    return fullName.includes(searchTerm) ||
+                           phone.includes(searchTerm) ||
+                           storeName.includes(searchTerm) ||
+                           lga.includes(searchTerm) ||
+                           ae.includes(searchTerm);
+                }
+            });
+        }
+        
+        renderTable(results);
     };
 
     // Filter Button Logic
     const updateFilterButtons = () => {
-        // Active: Blue background, white text, shadow, hover effect
-        // Inactive: White background, gray text, border, hover effect
-        
         const setActive = (btn) => {
-            btn.className = "flex-1 px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-md bg-blue-600 text-white border border-transparent tracking-wide hover:bg-blue-700";
+            btn.className = "flex-1 px-2 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-md bg-blue-600 text-white border border-transparent tracking-wide hover:bg-blue-700 flex items-center justify-center gap-1";
         };
 
         const setInactive = (btn) => {
-            btn.className = "flex-1 px-4 py-1.5 sm:py-2 text-xs sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-sm bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 tracking-wide";
+            btn.className = "flex-1 px-2 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-sm bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 tracking-wide flex items-center justify-center gap-1";
         };
 
-        if (searchFilter === 'all') setActive(filterBtnAll); else setInactive(filterBtnAll);
-        if (searchFilter === 'ae') setActive(filterBtnAe); else setInactive(filterBtnAe);
-        if (searchFilter === 'merchant') setActive(filterBtnMerchant); else setInactive(filterBtnMerchant);
+        if (viewMode === 'activity') {
+            setInactive(filterBtnAll);
+            setInactive(filterBtnAe);
+            setInactive(filterBtnMerchant);
+            setActive(filterBtnActivity);
+        } else {
+            if (searchFilter === 'all') setActive(filterBtnAll); else setInactive(filterBtnAll);
+            if (searchFilter === 'ae') setActive(filterBtnAe); else setInactive(filterBtnAe);
+            if (searchFilter === 'merchant') setActive(filterBtnMerchant); else setInactive(filterBtnMerchant);
+            setInactive(filterBtnActivity);
+        }
     };
 
     filterBtnAll.addEventListener('click', () => {
         searchFilter = 'all';
+        viewMode = 'monitor';
         updateFilterButtons();
         handleSearch();
     });
 
     filterBtnAe.addEventListener('click', () => {
         searchFilter = 'ae';
+        viewMode = 'monitor';
         updateFilterButtons();
         handleSearch();
     });
 
     filterBtnMerchant.addEventListener('click', () => {
         searchFilter = 'merchant';
+        viewMode = 'monitor';
         updateFilterButtons();
         handleSearch();
     });
 
+    filterBtnActivity.addEventListener('click', () => {
+        viewMode = 'activity';
+        updateFilterButtons();
+        // If data isn't loaded, refreshStatuses should have been called on load.
+        // If it failed or is empty, we could trigger it again, but handleSearch handles empty state.
+        handleSearch();
+    });
+
     const refreshStatuses = async () => {
-        // Support both V1 structure and V2 structure
         const apiBase = monitorData.apiBaseUrl || monitorData.api;
         const startDateProp = monitorData.reactivationStartDate || (monitorData.d2 ? monitorData.d2.e : null);
 
@@ -493,20 +576,22 @@ document.addEventListener('DOMContentLoaded', async () => {
             const retentionEndpoint = apiBase.replace('/churn', '/retention');
             const url = `${retentionEndpoint}?download=retained-user-stats&startDate=${startDateStr}&endDate=${endDateStr}`;
             
-            const response = await fetch(url);
-            if (!response.ok) throw new Error(`API error: ${response.status} ${response.statusText}`);
+            // 1. Fetch full data
+            const results = await fetchAndParse(url);
             
-            const csvText = await response.text();
-            const result = await new Promise((resolve, reject) => {
-                Papa.parse(csvText, {
-                    header: true,
-                    skipEmptyLines: true,
-                    complete: resolve,
-                    error: reject
-                });
-            });
+            // 2. Store full data for "Activity View"
+            // We need to ensure numeric conversion for consistency if needed, but strings are fine for display/filtering
+            activePeriodData = results.map(row => ({
+                ...row,
+                // Ensure Created Date is present or mapped if different in this endpoint
+                // 'retained-user-stats' usually has 'Last Transaction Date' or similar? 
+                // Actually the API returns 'Created Date' as the user's join date usually. 
+                // For "Last Sale Date" display, we might want the date of the transaction in the period.
+                // But let's stick to the existing field structure to avoid breaking changes.
+            }));
 
-            const activePhoneNumbers = new Set(result.data.map(row => row['Phone Number']));
+            // 3. Update "Assigned Users" status (Monitor View)
+            const activePhoneNumbers = new Set(results.map(row => row['Phone Number']));
             assignedUsers.forEach(user => {
                 user.status = activePhoneNumbers.has(user['Phone Number']) ? 'Reactivated' : 'Churned';
             });
@@ -524,13 +609,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const updateViewMode = () => {
-        // REQ 3: Explicitly show elements here. They are hidden by default in HTML.
         if (isAgentView) {
             copyAgentLinkBtn.classList.add('hidden');
             viewAsAdminBtn.classList.remove('hidden');
-            // Reactivated card visibility is now handled by renderTable
             timeRemainingCard.classList.remove('hidden'); 
             searchInput.value = '';
+            // Don't render empty table immediately, let handleSearch decide based on mode
             renderTable([]);
         } else {
             copyAgentLinkBtn.classList.remove('hidden');
@@ -597,14 +681,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     if (decodeMonitorData()) {
         // If V2, we need to hydrate data first
         if (monitorData.v === 2) {
-            // NOTE: updateViewMode called AFTER hydration to prevent flash of empty tables/wrong UI
             hydrateMonitorData().then(success => {
                 if (success) {
                     updateMonitorInfo();
                     updateTimeRemaining();
-                    updateViewMode(); // Call this here for V2 to respect loaded data
+                    updateViewMode(); 
                     refreshStatuses();
-                    // Start timer only after successful load
                     setInterval(updateTimeRemaining, 60000);
                 }
             });
