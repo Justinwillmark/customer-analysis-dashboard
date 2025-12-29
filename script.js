@@ -705,21 +705,16 @@ Date & Time Stamp of Generated Report: ${timestamp}
         const totalSystemAmount = sortedStats.reduce((sum, item) => sum + item.amount, 0);
 
         // 4. Construct Header
+        // CHANGED: Added date range and removed fullscreen button
+        const periodText = formatPeriodText(dateRange2);
+        
         const managementHeader = document.createElement('div');
         managementHeader.className = 'management-header';
         managementHeader.innerHTML = `
             <div class="flex flex-col">
                 <h3 class="management-title">AE Retention View</h3>
-                <p class="text-xs text-slate-500">Breakdown of retained merchants by Account Executive.</p>
+                <p class="text-xs text-slate-500">Breakdown of retained merchants by Account Executive (${periodText}).</p>
             </div>
-            <button class="fullscreen-toggle-btn" title="Toggle Fullscreen">
-                <svg id="maximize-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                </svg>
-                <svg id="minimize-icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-5 h-5 hidden">
-                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 9V4.5M9 9H4.5M9 9L3.75 3.75M9 15v4.5M9 15H4.5M9 15l-5.25 5.25M15 9h4.5M15 9V4.5M15 9l5.25-5.25M15 15h4.5M15 15v4.5m0-4.5l5.25 5.25" />
-                </svg>
-            </button>
         `;
 
         // 5. Construct Table
@@ -810,24 +805,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
         container.appendChild(tableContainer);
         container.appendChild(footer);
 
-        // 8. Fullscreen Logic (Reused)
-        const fullscreenBtn = container.querySelector('.fullscreen-toggle-btn');
-        const freezeBodyScroll = () => document.body.classList.add('fullscreen-active');
-        const unfreezeBodyScroll = () => document.body.classList.remove('fullscreen-active');
-        
-        fullscreenBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isNowFullscreen = container.classList.toggle('fullscreen');
-            
-            container.querySelector('#maximize-icon').classList.toggle('hidden');
-            container.querySelector('#minimize-icon').classList.toggle('hidden');
-
-            if (isNowFullscreen) {
-                freezeBodyScroll();
-            } else {
-                unfreezeBodyScroll();
-            }
-        });
+        // CHANGED: Fullscreen logic removed for AE Retention View as per request
     };
 
     const expandChurnPopup = (container, title, data) => {

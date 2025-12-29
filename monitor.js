@@ -501,11 +501,11 @@ document.addEventListener('DOMContentLoaded', async () => {
     // Filter Button Logic
     const updateFilterButtons = () => {
         const setActive = (btn) => {
-            btn.className = "flex-1 px-2 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-md bg-blue-600 text-white border border-transparent tracking-wide hover:bg-blue-700 flex items-center justify-center gap-1";
+            btn.className = "flex-1 px-0 py-1 sm:px-4 sm:py-2 text-[8px] sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-md bg-blue-600 text-white border border-transparent tracking-normal sm:tracking-wide hover:bg-blue-700 flex items-center justify-center gap-1";
         };
 
         const setInactive = (btn) => {
-            btn.className = "flex-1 px-2 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-sm bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 tracking-wide flex items-center justify-center gap-1";
+            btn.className = "flex-1 px-0 py-1 sm:px-4 sm:py-2 text-[8px] sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-sm bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 tracking-normal sm:tracking-wide flex items-center justify-center gap-1";
         };
 
         if (viewMode === 'activity') {
