@@ -1,3 +1,4 @@
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -113,15 +114,19 @@
             </div>
             
             <div class="flex justify-center mt-3">
-                <div class="flex gap-2 w-[98%] sm:w-[85%] lg:w-[70%]">
-                    <button id="filter-btn-all" class="flex-1 px-0 py-1 sm:px-4 sm:py-2 text-[8px] sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-md bg-blue-600 text-white border border-transparent tracking-normal sm:tracking-wide hover:bg-blue-700">All</button>
-                    <button id="filter-btn-ae" class="flex-1 px-0 py-1 sm:px-4 sm:py-2 text-[8px] sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-sm bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 tracking-normal sm:tracking-wide">AE/Agent</button>
-                    <button id="filter-btn-merchant" class="flex-1 px-0 py-1 sm:px-4 sm:py-2 text-[8px] sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-sm bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 tracking-normal sm:tracking-wide">Merchant</button>
-                    <button id="filter-btn-activity" class="flex-1 px-0 py-1 sm:px-4 sm:py-2 text-[8px] sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-sm bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 tracking-normal sm:tracking-wide flex items-center justify-center gap-1">
-                        <svg xmlns="http://www.w3.org/2000/svg" class="h-2.5 w-2.5 sm:h-4 sm:w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                <div class="flex gap-1 w-full sm:w-[85%] lg:w-[70%] px-1 sm:px-0">
+                    <button id="filter-btn-all" class="flex-1 px-0 py-1 sm:px-4 sm:py-2 text-[10px] tracking-tight sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-md bg-blue-600 text-white border border-transparent sm:tracking-wide hover:bg-blue-700">All</button>
+                    <button id="filter-btn-ae" class="flex-1 px-0 py-1 sm:px-4 sm:py-2 text-[10px] tracking-tight sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-sm bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 sm:tracking-wide">
+                        <span class="sm:hidden">Agent</span><span class="hidden sm:inline">AE/Agent</span>
+                    </button>
+                    <button id="filter-btn-merchant" class="flex-1 px-0 py-1 sm:px-4 sm:py-2 text-[10px] tracking-tight sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-sm bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 sm:tracking-wide">
+                        <span class="sm:hidden">Merch</span><span class="hidden sm:inline">Merchant</span>
+                    </button>
+                    <button id="filter-btn-activity" class="flex-1 px-0 py-1 sm:px-4 sm:py-2 text-[10px] tracking-tight sm:text-sm font-medium rounded-full transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-1 focus:ring-blue-500 shadow-sm bg-white text-gray-600 border border-gray-200 hover:bg-gray-50 sm:tracking-wide flex items-center justify-center gap-1">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="hidden sm:block h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                         </svg>
-                        AE Activity
+                        <span class="sm:hidden">Activity</span><span class="hidden sm:inline">AE Activity</span>
                     </button>
                 </div>
             </div>
