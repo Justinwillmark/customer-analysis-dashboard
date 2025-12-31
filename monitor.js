@@ -1,3 +1,4 @@
+
 document.addEventListener('DOMContentLoaded', async () => {
     // DOM Elements
     const monitorInfo = document.getElementById('monitor-info');
@@ -552,10 +553,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const refreshStatuses = async () => {
         const apiBase = monitorData.apiBaseUrl || monitorData.api;
-        const startDateProp = monitorData.reactivationStartDate || (monitorData.d2 ? monitorData.d2.e : null);
+        // Legacy: Start from Churn Period End - 1 Day (Ensures we catch ALL reactivations for status check)
+        const legacyStartProp = monitorData.reactivationStartDate || (monitorData.d2 ? monitorData.d2.e : null);
+        let startDate;
+        
+        if (legacyStartProp) {
+            startDate = new Date(legacyStartProp + 'T00:00:00');
+            startDate.setDate(startDate.getDate() - 1);
+        }
 
-        if (!apiBase || !startDateProp) {
-            alert('Missing API configuration. Cannot refresh statuses.');
+        if (!apiBase || !startDate) {
+            alert('Missing API configuration or start date. Cannot refresh statuses.');
             return;
         }
 
@@ -565,32 +573,56 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadingSpinner.classList.remove('hidden');
 
         try {
-            const reactivationStart = new Date(startDateProp + 'T00:00:00');
-            const startDate = new Date(reactivationStart);
-            startDate.setDate(startDate.getDate() - 1); 
-            const today = new Date();
-            const endDate = new Date(today);
+            // --- EXPIRY LOGIC (End Date) ---
+            let cutoffDate = new Date(); // Default to today (Local)
+
+            if (monitorData.dueDate) {
+                const parts = monitorData.dueDate.split('-');
+                if (parts.length === 3) {
+                    const dueEnd = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                    dueEnd.setHours(23, 59, 59, 999);
+
+                    // If Today is past the Due Date, freeze results at Due Date
+                    if (cutoffDate > dueEnd) {
+                        cutoffDate = dueEnd;
+                    }
+                }
+            }
+            
+            const endDate = new Date(cutoffDate);
             endDate.setDate(endDate.getDate() + 1); 
+            // ---------------------------
+
             const startDateStr = toYYYYMMDD(startDate);
             const endDateStr = toYYYYMMDD(endDate);
             const retentionEndpoint = apiBase.replace('/churn', '/retention');
             const url = `${retentionEndpoint}?download=retained-user-stats&startDate=${startDateStr}&endDate=${endDateStr}`;
             
-            // 1. Fetch full data
+            // 1. Fetch full data (From churn period end)
             const results = await fetchAndParse(url);
             
-            // 2. Store full data for "Activity View"
-            // We need to ensure numeric conversion for consistency if needed, but strings are fine for display/filtering
-            activePeriodData = results.map(row => ({
+            // 2. Filter data for "Activity View" ONLY
+            // We want Activity View to show only users active AFTER the monitor was created (if V2)
+            let activityViewData = results;
+
+            if (monitorData.creationDate) {
+                // Set creation time to midnight to be inclusive of the creation day
+                const creationTime = new Date(monitorData.creationDate);
+                creationTime.setHours(0,0,0,0);
+
+                activityViewData = results.filter(row => {
+                    if (!row['Created Date']) return false;
+                    const rowDate = new Date(row['Created Date']);
+                    return rowDate >= creationTime;
+                });
+            }
+
+            activePeriodData = activityViewData.map(row => ({
                 ...row,
-                // Ensure Created Date is present or mapped if different in this endpoint
-                // 'retained-user-stats' usually has 'Last Transaction Date' or similar? 
-                // Actually the API returns 'Created Date' as the user's join date usually. 
-                // For "Last Sale Date" display, we might want the date of the transaction in the period.
-                // But let's stick to the existing field structure to avoid breaking changes.
             }));
 
-            // 3. Update "Assigned Users" status (Monitor View)
+            // 3. Update "Assigned Users" status (Monitor View) - Uses FULL results
+            // This ensures older reactivations (before creation date) are still marked correctly
             const activePhoneNumbers = new Set(results.map(row => row['Phone Number']));
             assignedUsers.forEach(user => {
                 user.status = activePhoneNumbers.has(user['Phone Number']) ? 'Reactivated' : 'Churned';
