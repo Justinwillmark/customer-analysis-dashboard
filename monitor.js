@@ -1,4 +1,3 @@
-
 document.addEventListener('DOMContentLoaded', async () => {
     // DOM Elements
     const monitorInfo = document.getElementById('monitor-info');
@@ -553,16 +552,13 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const refreshStatuses = async () => {
         const apiBase = monitorData.apiBaseUrl || monitorData.api;
-        // Legacy: Start from Churn Period End - 1 Day (Ensures we catch ALL reactivations for status check)
-        const legacyStartProp = monitorData.reactivationStartDate || (monitorData.d2 ? monitorData.d2.e : null);
-        let startDate;
         
-        if (legacyStartProp) {
-            startDate = new Date(legacyStartProp + 'T00:00:00');
-            startDate.setDate(startDate.getDate() - 1);
-        }
-
-        if (!apiBase || !startDate) {
+        // --- UPDATED START DATE LOGIC ---
+        // Priority: Creation Date. Fallback: Reactivation Start Date or Churn Period End
+        // We want to effectively capture "Universal Active Merchants" since the monitor started.
+        let startDateVal = monitorData.creationDate || monitorData.cr || monitorData.reactivationStartDate || (monitorData.d2 ? monitorData.d2.e : null);
+        
+        if (!apiBase || !startDateVal) {
             alert('Missing API configuration or start date. Cannot refresh statuses.');
             return;
         }
@@ -573,51 +569,46 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadingSpinner.classList.remove('hidden');
 
         try {
-            // --- EXPIRY LOGIC (End Date) ---
-            let cutoffDate = new Date(); // Default to today (Local)
+            // --- ROBUST DATE LOGIC (Buffer Days) ---
+            // Start Date = Creation Date - 1 Day (to catch timezone overlaps)
+            const startDate = new Date(startDateVal);
+            startDate.setDate(startDate.getDate() - 1); 
 
+            // End Date = Due Date + 1 Day (or Today + 1 Day if not expired yet)
+            let limitDate = new Date(); // Default to Now
+            
             if (monitorData.dueDate) {
+                // Parse "YYYY-MM-DD" safely
                 const parts = monitorData.dueDate.split('-');
                 if (parts.length === 3) {
+                     // Create date object for Due Date
                     const dueEnd = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
                     dueEnd.setHours(23, 59, 59, 999);
 
-                    // If Today is past the Due Date, freeze results at Due Date
-                    if (cutoffDate > dueEnd) {
-                        cutoffDate = dueEnd;
+                    // If today is past the Due Date, freeze results at Due Date.
+                    // If today is before Due Date, use today (limitDate).
+                    if (limitDate > dueEnd) {
+                        limitDate = dueEnd;
                     }
                 }
             }
             
-            const endDate = new Date(cutoffDate);
-            endDate.setDate(endDate.getDate() + 1); 
-            // ---------------------------
-
+            const endDate = new Date(limitDate);
+            endDate.setDate(endDate.getDate() + 1); // Add 1 day buffer to end date
+            
             const startDateStr = toYYYYMMDD(startDate);
             const endDateStr = toYYYYMMDD(endDate);
+            
             const retentionEndpoint = apiBase.replace('/churn', '/retention');
             const url = `${retentionEndpoint}?download=retained-user-stats&startDate=${startDateStr}&endDate=${endDateStr}`;
             
-            // 1. Fetch full data (From churn period end)
+            // 1. Fetch full activity data (Creation-1 to Due+1)
             const results = await fetchAndParse(url);
             
-            // 2. Filter data for "Activity View" ONLY
-            // We want Activity View to show only users active AFTER the monitor was created (if V2)
-            let activityViewData = results;
-
-            if (monitorData.creationDate) {
-                // Set creation time to midnight to be inclusive of the creation day
-                const creationTime = new Date(monitorData.creationDate);
-                creationTime.setHours(0,0,0,0);
-
-                activityViewData = results.filter(row => {
-                    if (!row['Created Date']) return false;
-                    const rowDate = new Date(row['Created Date']);
-                    return rowDate >= creationTime;
-                });
-            }
-
-            activePeriodData = activityViewData.map(row => ({
+            // 2. Set Activity Data directly from Results
+            // We removed the strict creationDate filtering to ensure data from "Yesterday" (via the buffer) is visible if relevant.
+            // This fixes the issue where "today's" data was being clipped due to timezone differences.
+            activePeriodData = results.map(row => ({
                 ...row,
             }));
 
