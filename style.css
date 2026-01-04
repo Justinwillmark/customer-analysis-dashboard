@@ -642,3 +642,19 @@ body {
     background-color: #e0f2fe; /* sky-100 */
     color: #0369a1; /* sky-800 */
 }
+
+/* NEW: Onboarding Styles */
+.onboarding-row {
+    background-color: #f5f3ff; /* violet-50 */
+}
+.onboarding-row:hover {
+    background-color: #ede9fe !important; /* violet-100 */
+}
+.onboarding-row td:first-child {
+    border-left: 4px solid #8b5cf6; /* violet-500 */
+}
+
+.status-onboarding {
+    background-color: #ede9fe; /* violet-100 */
+    color: #5b21b6; /* violet-800 */
+}

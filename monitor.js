@@ -27,17 +27,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     const cancelLoginBtn = document.getElementById('cancel-login-btn');
 
     // Filter Buttons
-    const filterBtnAll = document.getElementById('filter-btn-all');
-    const filterBtnAe = document.getElementById('filter-btn-ae');
-    const filterBtnMerchant = document.getElementById('filter-btn-merchant');
-    const filterBtnActivity = document.getElementById('filter-btn-activity');
+    const filterBtnReactivation = document.getElementById('filter-btn-ae'); // "For Reactivation"
+    const filterBtnOnboarding = document.getElementById('filter-btn-onboarding'); // "Onboarding"
+    const filterBtnActivity = document.getElementById('filter-btn-activity'); // "Activity"
 
     // State
     let monitorData = null;
     let assignedUsers = [];
     let activePeriodData = []; // Stores full list of active users from API
-    let searchFilter = 'all'; // 'all', 'ae', 'merchant'
-    let viewMode = 'monitor'; // 'monitor' | 'activity'
+    let viewMode = 'reactivation'; // 'reactivation' | 'onboarding' | 'activity'
     
     // Check URL parameters for view mode
     const urlParams = new URLSearchParams(window.location.search);
@@ -187,7 +185,6 @@ document.addEventListener('DOMContentLoaded', async () => {
             if (!hash) throw new Error('No monitor data found in URL.');
             
             // OPTIMIZED FIX: Convert to Uint8Array directly
-            // This prevents "undefined" return from pako on mobile browsers
             const binaryString = atob(hash);
             const len = binaryString.length;
             const bytes = new Uint8Array(len);
@@ -262,18 +259,23 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const updateReactivatedCount = (usersSubset) => {
-        if (viewMode === 'activity') {
+        if (viewMode === 'activity' || viewMode === 'onboarding') {
             reactivatedCardTitle.textContent = "Total Active";
             const total = usersSubset.length;
             reactivatedCount.textContent = total;
             reactivatedProgress.style.width = '100%';
         } else {
+            // viewMode === 'reactivation' (formerly 'ae'/'monitor')
+            // This mode only shows NON-reactivated users. 
+            // So we need to calculate stats from the FULL assignedUsers list, not just the filtered view.
             reactivatedCardTitle.textContent = "Users Reactivated";
-            const reactivated = usersSubset.filter(u => u.status === 'Reactivated').length;
-            const total = usersSubset.length;
-            reactivatedCount.textContent = `${reactivated}/${total}`;
             
-            const percentage = total > 0 ? (reactivated / total) * 100 : 0;
+            const totalAssigned = assignedUsers.length;
+            const reactivated = assignedUsers.filter(u => u.status === 'Reactivated').length;
+            
+            reactivatedCount.textContent = `${reactivated}/${totalAssigned}`;
+            
+            const percentage = totalAssigned > 0 ? (reactivated / totalAssigned) * 100 : 0;
             reactivatedProgress.style.width = `${percentage}%`;
         }
     };
@@ -284,7 +286,8 @@ document.addEventListener('DOMContentLoaded', async () => {
         noResults.classList.add('hidden');
 
         // VISIBILITY LOGIC:
-        if (isAgentView && viewMode === 'monitor') {
+        if (isAgentView) {
+             // For any agent view mode, we want the search prompt if empty
             if (searchInput.value.trim() === '') {
                  reactivatedCard.classList.remove('hidden'); 
                  reactivatedCount.textContent = '0/0';
@@ -297,14 +300,14 @@ document.addEventListener('DOMContentLoaded', async () => {
                  monitorMobileList.innerHTML = `<div class="text-center text-gray-500 py-12 italic text-lg">Type in the search bar above to get results.</div>`;
                  return;
             } else {
-                 reactivatedCard.classList.remove('hidden'); // Show stats for search results
-                 updateReactivatedCount(usersToRender); // Update stats based on SEARCH results
+                 reactivatedCard.classList.remove('hidden'); 
             }
         } else {
-            // Admin View OR Activity Mode:
             reactivatedCard.classList.remove('hidden');
-            updateReactivatedCount(usersToRender); 
         }
+        
+        // Update stats based on current view logic. 
+        updateReactivatedCount(usersToRender); 
 
         // Standard empty state handling for search results
         if (usersToRender.length === 0) {
@@ -330,23 +333,19 @@ document.addEventListener('DOMContentLoaded', async () => {
 
             // Determine Status Styling
             let statusBadge = '';
-            if (viewMode === 'activity') {
-                if (user.status === 'Reactivation-based') {
-                    tr.classList.add('reactivated-row');
-                    statusBadge = `<span class="status-badge status-reactivated">Reactivation-based</span>`;
-                } else {
-                    // Organic Active
-                    tr.classList.add('onboarded-row'); // Using existing light blue style or new one
-                    statusBadge = `<span class="status-badge status-onboarded">Organic Active</span>`;
-                }
+            
+            if (user.status === 'Onboarding') {
+                tr.classList.add('onboarding-row');
+                statusBadge = `<span class="status-badge status-onboarding">Onboarding</span>`;
+            } else if (user.status === 'Reactivation-based' || user.status === 'Reactivated') {
+                tr.classList.add('reactivated-row');
+                statusBadge = `<span class="status-badge status-reactivated">${user.status === 'Reactivated' ? 'Reactivated' : 'Reactivation-based'}</span>`;
+            } else if (user.status === 'Organic Active') {
+                tr.classList.add('onboarded-row'); 
+                statusBadge = `<span class="status-badge status-onboarded">Organic Active</span>`;
             } else {
-                const isReactivated = user.status === 'Reactivated';
-                if (isReactivated) {
-                    tr.classList.add('reactivated-row');
-                }
-                statusBadge = isReactivated
-                    ? `<span class="status-badge status-reactivated">Reactivated</span>`
-                    : `<span class="status-badge status-churned">Churned</span>`;
+                // Churned
+                statusBadge = `<span class="status-badge status-churned">Churned</span>`;
             }
 
             tr.innerHTML = `
@@ -366,12 +365,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             const card = document.createElement('div');
             let cardClasses = `bg-white p-3 rounded-lg shadow-sm border border-gray-100 flex flex-col gap-2`;
             
-            if (viewMode === 'activity') {
-                 if (user.status === 'Reactivation-based') cardClasses += ' border-green-200 bg-green-50';
-                 else cardClasses += ' border-blue-200 bg-blue-50';
-            } else {
-                 if (user.status === 'Reactivated') cardClasses += ' border-green-200 bg-green-50';
-            }
+            if (user.status === 'Onboarding') cardClasses += ' border-purple-200 bg-purple-50';
+            else if (user.status === 'Reactivation-based' || user.status === 'Reactivated') cardClasses += ' border-green-200 bg-green-50';
+            else if (user.status === 'Organic Active') cardClasses += ' border-blue-200 bg-blue-50';
             
             card.className = cardClasses;
             
@@ -426,72 +422,89 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const handleSearch = () => {
         const searchTerm = searchInput.value.toLowerCase().trim();
-        
         let results = [];
 
-        if (viewMode === 'activity') {
-            // --- Activity View Logic ---
-            if (activePeriodData.length === 0) {
-                // If data hasn't loaded yet, try to refresh or show empty
-                if (!loadingSpinner.classList.contains('hidden')) return; // Still loading
-            }
-            
-            // Determine the "Target AE" context
-            // 1. If searching, use search term against Referral Code
-            // 2. If Agent View (and no search), use the Agent's name derived from assignments
-            let targetAE = searchTerm;
-            if (!targetAE && isAgentView && assignedUsers.length > 0) {
-                 targetAE = assignedUsers[0].assignedAE.toLowerCase();
-            }
+        // Common logic for active data processing (used by Onboarding and Activity modes)
+        const processActiveData = () => {
+             // Create a set of phone numbers that are on the monitor list (assignedUsers)
+             const monitoredPhoneNumbers = new Set(assignedUsers.map(u => u['Phone Number']));
+             
+             // Define cutoff for Onboarding: Creation Date - 1 Day (Buffer for timezones/immediate onboarding)
+             const monitorCreationDate = new Date(monitorData.creationDate || monitorData.cr || monitorData.d2.e);
+             const onboardingCutoff = new Date(monitorCreationDate);
+             onboardingCutoff.setDate(onboardingCutoff.getDate() - 1); // 1 Day Buffer
+             onboardingCutoff.setHours(0,0,0,0);
 
-            if (!targetAE) {
-                // Admin mode with no search -> Show nothing or all? 
-                // Matches standard behavior: Admin sees nothing until search
-                renderTable([]); 
-                return;
-            }
-
-            // Create a set of phone numbers that are on the monitor list (assignedUsers)
-            const monitoredPhoneNumbers = new Set(assignedUsers.map(u => u['Phone Number']));
-
-            results = activePeriodData.filter(user => {
-                const referral = (user['Referral Code'] || '').toLowerCase();
-                // Check if this active user belongs to the target AE
-                return referral.includes(targetAE);
-            }).map(user => {
+             return activePeriodData.map(user => {
                 const isMonitored = monitoredPhoneNumbers.has(user['Phone Number']);
+                let status = 'Organic Active';
+
+                if (isMonitored) {
+                    status = 'Reactivation-based';
+                } else {
+                    const userCreated = new Date(user['Created Date']);
+                    userCreated.setHours(0,0,0,0);
+                    // If created after (or just before) monitor creation, it's Onboarding
+                    if (userCreated >= onboardingCutoff) {
+                        status = 'Onboarding';
+                    }
+                }
+
                 return {
                     ...user,
                     assignedAE: user['Referral Code'], // For display consistency
-                    status: isMonitored ? 'Reactivation-based' : 'Organic Active'
+                    status: status
                 };
+             });
+        };
+
+        if (viewMode === 'reactivation') {
+            // --- 1. For Reactivation Mode ---
+            // Data Source: assignedUsers (churned list)
+            // Filter 1: Exclude already Reactivated users
+            // Filter 2: Search only against AE Name
+            
+            results = assignedUsers.filter(user => {
+                // If they are Reactivated, they shouldn't show here anymore
+                if (user.status === 'Reactivated') return false;
+
+                const ae = (user.assignedAE || '').toLowerCase();
+                return ae.includes(searchTerm);
             });
 
-        } else {
-            // --- Monitor View Logic (Standard) ---
-            results = assignedUsers.filter(user => {
-                const fullName = `${user['First Name']} ${user['Last Name']}`.toLowerCase();
-                const phone = (user['Phone Number'] || '').toLowerCase();
-                const storeName = (user['Store Name'] || '').toLowerCase();
-                const lga = (user['LGA'] || '').toLowerCase();
-                const ae = (user.assignedAE || '').toLowerCase();
-                const address = (user['Store Address'] || '').toLowerCase();
+        } else if (viewMode === 'onboarding') {
+            // --- 2. Onboarding Mode ---
+            // Data Source: activePeriodData (live API)
+            // Filter 1: Status must be 'Onboarding'
+            // Filter 2: Search only against AE Name (Referral Code)
 
-                if (searchFilter === 'ae') {
-                    return ae.includes(searchTerm);
-                } else if (searchFilter === 'merchant') {
-                    return fullName.includes(searchTerm) ||
-                           phone.includes(searchTerm) ||
-                           storeName.includes(searchTerm) ||
-                           lga.includes(searchTerm) ||
-                           address.includes(searchTerm);
-                } else {
-                    return fullName.includes(searchTerm) ||
-                           phone.includes(searchTerm) ||
-                           storeName.includes(searchTerm) ||
-                           lga.includes(searchTerm) ||
-                           ae.includes(searchTerm);
-                }
+            if (activePeriodData.length === 0 && !loadingSpinner.classList.contains('hidden')) return;
+
+            const processedData = processActiveData();
+            
+            results = processedData.filter(user => {
+                if (user.status !== 'Onboarding') return false;
+
+                const ae = (user.assignedAE || '').toLowerCase();
+                return ae.includes(searchTerm);
+            });
+
+        } else if (viewMode === 'activity') {
+            // --- 3. Activity Mode ---
+            // Data Source: activePeriodData (live API)
+            // Filter 1: Status must be 'Organic Active' OR 'Reactivation-based' (Exclude Onboarding)
+            // Filter 2: Search only against AE Name (Referral Code)
+            
+            if (activePeriodData.length === 0 && !loadingSpinner.classList.contains('hidden')) return;
+
+            const processedData = processActiveData();
+
+            results = processedData.filter(user => {
+                // Exclude Onboarding
+                if (user.status === 'Onboarding') return false;
+
+                const ae = (user.assignedAE || '').toLowerCase();
+                return ae.includes(searchTerm);
             });
         }
         
@@ -509,53 +522,43 @@ document.addEventListener('DOMContentLoaded', async () => {
         };
 
         if (viewMode === 'activity') {
-            setInactive(filterBtnAll);
-            setInactive(filterBtnAe);
-            setInactive(filterBtnMerchant);
+            setInactive(filterBtnReactivation);
+            setInactive(filterBtnOnboarding);
             setActive(filterBtnActivity);
+        } else if (viewMode === 'onboarding') {
+            setInactive(filterBtnReactivation);
+            setActive(filterBtnOnboarding);
+            setInactive(filterBtnActivity);
         } else {
-            if (searchFilter === 'all') setActive(filterBtnAll); else setInactive(filterBtnAll);
-            if (searchFilter === 'ae') setActive(filterBtnAe); else setInactive(filterBtnAe);
-            if (searchFilter === 'merchant') setActive(filterBtnMerchant); else setInactive(filterBtnMerchant);
+            // Reactivation
+            setActive(filterBtnReactivation);
+            setInactive(filterBtnOnboarding);
             setInactive(filterBtnActivity);
         }
     };
 
-    filterBtnAll.addEventListener('click', () => {
-        searchFilter = 'all';
-        viewMode = 'monitor';
+    filterBtnReactivation.addEventListener('click', () => {
+        viewMode = 'reactivation';
         updateFilterButtons();
         handleSearch();
     });
 
-    filterBtnAe.addEventListener('click', () => {
-        searchFilter = 'ae';
-        viewMode = 'monitor';
+    filterBtnOnboarding.addEventListener('click', () => {
+        viewMode = 'onboarding';
         updateFilterButtons();
-        handleSearch();
-    });
-
-    filterBtnMerchant.addEventListener('click', () => {
-        searchFilter = 'merchant';
-        viewMode = 'monitor';
-        updateFilterButtons();
+        // Trigger data processing if needed
         handleSearch();
     });
 
     filterBtnActivity.addEventListener('click', () => {
         viewMode = 'activity';
         updateFilterButtons();
-        // If data isn't loaded, refreshStatuses should have been called on load.
-        // If it failed or is empty, we could trigger it again, but handleSearch handles empty state.
         handleSearch();
     });
 
     const refreshStatuses = async () => {
         const apiBase = monitorData.apiBaseUrl || monitorData.api;
         
-        // --- UPDATED START DATE LOGIC ---
-        // Priority: Creation Date. Fallback: Reactivation Start Date or Churn Period End
-        // We want to effectively capture "Universal Active Merchants" since the monitor started.
         let startDateVal = monitorData.creationDate || monitorData.cr || monitorData.reactivationStartDate || (monitorData.d2 ? monitorData.d2.e : null);
         
         if (!apiBase || !startDateVal) {
@@ -569,24 +572,17 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadingSpinner.classList.remove('hidden');
 
         try {
-            // --- ROBUST DATE LOGIC (Buffer Days) ---
-            // Start Date = Creation Date - 1 Day (to catch timezone overlaps)
+            // Buffer Date Logic
             const startDate = new Date(startDateVal);
             startDate.setDate(startDate.getDate() - 1); 
 
-            // End Date = Due Date + 1 Day (or Today + 1 Day if not expired yet)
             let limitDate = new Date(); // Default to Now
             
             if (monitorData.dueDate) {
-                // Parse "YYYY-MM-DD" safely
                 const parts = monitorData.dueDate.split('-');
                 if (parts.length === 3) {
-                     // Create date object for Due Date
                     const dueEnd = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
                     dueEnd.setHours(23, 59, 59, 999);
-
-                    // If today is past the Due Date, freeze results at Due Date.
-                    // If today is before Due Date, use today (limitDate).
                     if (limitDate > dueEnd) {
                         limitDate = dueEnd;
                     }
@@ -594,7 +590,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             }
             
             const endDate = new Date(limitDate);
-            endDate.setDate(endDate.getDate() + 1); // Add 1 day buffer to end date
+            endDate.setDate(endDate.getDate() + 1); // Add 1 day buffer
             
             const startDateStr = toYYYYMMDD(startDate);
             const endDateStr = toYYYYMMDD(endDate);
@@ -602,18 +598,15 @@ document.addEventListener('DOMContentLoaded', async () => {
             const retentionEndpoint = apiBase.replace('/churn', '/retention');
             const url = `${retentionEndpoint}?download=retained-user-stats&startDate=${startDateStr}&endDate=${endDateStr}`;
             
-            // 1. Fetch full activity data (Creation-1 to Due+1)
+            // 1. Fetch full activity data
             const results = await fetchAndParse(url);
             
-            // 2. Set Activity Data directly from Results
-            // We removed the strict creationDate filtering to ensure data from "Yesterday" (via the buffer) is visible if relevant.
-            // This fixes the issue where "today's" data was being clipped due to timezone differences.
+            // 2. Set Activity Data
             activePeriodData = results.map(row => ({
                 ...row,
             }));
 
-            // 3. Update "Assigned Users" status (Monitor View) - Uses FULL results
-            // This ensures older reactivations (before creation date) are still marked correctly
+            // 3. Update "Assigned Users" status for Reactivation View
             const activePhoneNumbers = new Set(results.map(row => row['Phone Number']));
             assignedUsers.forEach(user => {
                 user.status = activePhoneNumbers.has(user['Phone Number']) ? 'Reactivated' : 'Churned';
@@ -637,7 +630,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             viewAsAdminBtn.classList.remove('hidden');
             timeRemainingCard.classList.remove('hidden'); 
             searchInput.value = '';
-            // Don't render empty table immediately, let handleSearch decide based on mode
+            // Don't render empty table immediately, let handleSearch decide
             renderTable([]);
         } else {
             copyAgentLinkBtn.classList.remove('hidden');
