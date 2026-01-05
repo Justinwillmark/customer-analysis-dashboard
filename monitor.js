@@ -34,7 +34,12 @@ document.addEventListener('DOMContentLoaded', async () => {
     // State
     let monitorData = null;
     let assignedUsers = [];
-    let activePeriodData = []; // Stores full list of active users from API
+    
+    // Split Data Sets
+    let onboardingData = []; // Buffer Range: Creation - 1 Day to Now
+    let activityData = [];   // Strict Range: Creation to Now
+    let historicalPhoneNumbers = new Set(); // Historical Range: Creation - 360 Days to Creation
+    
     let viewMode = 'reactivation'; // 'reactivation' | 'onboarding' | 'activity'
     
     // Check URL parameters for view mode
@@ -260,23 +265,29 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     const updateReactivatedCount = (usersSubset) => {
         if (viewMode === 'activity' || viewMode === 'onboarding') {
-            reactivatedCardTitle.textContent = "Total Active";
+            reactivatedCardTitle.textContent = viewMode === 'onboarding' ? "Total Onboarding" : "Total Active";
             const total = usersSubset.length;
             reactivatedCount.textContent = total;
             reactivatedProgress.style.width = '100%';
         } else {
             // viewMode === 'reactivation' (formerly 'ae'/'monitor')
-            // This mode only shows NON-reactivated users. 
-            // So we need to calculate stats from the FULL assignedUsers list, not just the filtered view.
-            reactivatedCardTitle.textContent = "Users Reactivated";
+            reactivatedCardTitle.innerHTML = `Churned Users <sup class="text-red-500 text-[10px] font-bold ml-1" style="font-size: 0.6rem;">Reactivate now!</sup>`;
             
-            const totalAssigned = assignedUsers.length;
-            const reactivated = assignedUsers.filter(u => u.status === 'Reactivated').length;
+            // Numerator: Count of Churned Users in the filtered list
+            const numerator = usersSubset.length;
             
-            reactivatedCount.textContent = `${reactivated}/${totalAssigned}`;
+            // Denominator: Total Assigned Users (Overall context)
+            const denominator = assignedUsers.length;
             
-            const percentage = totalAssigned > 0 ? (reactivated / totalAssigned) * 100 : 0;
+            // Percentage (Filtered / Total)
+            const percentage = denominator > 0 ? (numerator / denominator) * 100 : 0;
             reactivatedProgress.style.width = `${percentage}%`;
+
+            if (isAgentView) {
+                 reactivatedCount.textContent = `${numerator}`;
+            } else {
+                 reactivatedCount.textContent = `${numerator}/${denominator}`;
+            }
         }
     };
 
@@ -290,8 +301,18 @@ document.addEventListener('DOMContentLoaded', async () => {
              // For any agent view mode, we want the search prompt if empty
             if (searchInput.value.trim() === '') {
                  reactivatedCard.classList.remove('hidden'); 
-                 reactivatedCount.textContent = '0/0';
-                 reactivatedProgress.style.width = '0%';
+                 
+                 // Handle Counter Logic for Empty State in Agent View
+                 if (viewMode === 'reactivation') {
+                     reactivatedCardTitle.innerHTML = `Churned Users <sup class="text-red-500 text-[10px] font-bold ml-1" style="font-size: 0.6rem;">Reactivate now!</sup>`;
+                     // FIX: Show "--" instead of total churned backlog when no search is active
+                     reactivatedCount.textContent = '--'; 
+                     reactivatedProgress.style.width = '0%';
+                 } else {
+                     reactivatedCardTitle.textContent = viewMode === 'onboarding' ? "Total Onboarding" : "Total Active";
+                     reactivatedCount.textContent = '0';
+                     reactivatedProgress.style.width = '0%';
+                 }
                  
                  const emptyMsg = `
                     <tr><td colspan="9" class="px-6 py-12 text-center text-gray-500 italic text-lg">Type in the search bar above to get results.</td></tr>
@@ -306,7 +327,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             reactivatedCard.classList.remove('hidden');
         }
         
-        // Update stats based on current view logic. 
+        // Update stats based on current view logic (when search is active or in Admin view)
         updateReactivatedCount(usersToRender); 
 
         // Standard empty state handling for search results
@@ -423,88 +444,75 @@ document.addEventListener('DOMContentLoaded', async () => {
     const handleSearch = () => {
         const searchTerm = searchInput.value.toLowerCase().trim();
         let results = [];
-
-        // Common logic for active data processing (used by Onboarding and Activity modes)
-        const processActiveData = () => {
-             // Create a set of phone numbers that are on the monitor list (assignedUsers)
-             const monitoredPhoneNumbers = new Set(assignedUsers.map(u => u['Phone Number']));
-             
-             // Define cutoff for Onboarding: Creation Date - 1 Day (Buffer for timezones/immediate onboarding)
-             const monitorCreationDate = new Date(monitorData.creationDate || monitorData.cr || monitorData.d2.e);
-             const onboardingCutoff = new Date(monitorCreationDate);
-             onboardingCutoff.setDate(onboardingCutoff.getDate() - 1); // 1 Day Buffer
-             onboardingCutoff.setHours(0,0,0,0);
-
-             return activePeriodData.map(user => {
-                const isMonitored = monitoredPhoneNumbers.has(user['Phone Number']);
-                let status = 'Organic Active';
-
-                if (isMonitored) {
-                    status = 'Reactivation-based';
-                } else {
-                    const userCreated = new Date(user['Created Date']);
-                    userCreated.setHours(0,0,0,0);
-                    // If created after (or just before) monitor creation, it's Onboarding
-                    if (userCreated >= onboardingCutoff) {
-                        status = 'Onboarding';
-                    }
-                }
-
-                return {
-                    ...user,
-                    assignedAE: user['Referral Code'], // For display consistency
-                    status: status
-                };
-             });
+        
+        // Helper to check against search term
+        const matchesSearch = (user) => {
+            const ae = (user.assignedAE || user['Referral Code'] || '').toLowerCase();
+            return ae.includes(searchTerm);
         };
 
         if (viewMode === 'reactivation') {
-            // --- 1. For Reactivation Mode ---
+            // --- 1. Reactivation Mode ---
             // Data Source: assignedUsers (churned list)
-            // Filter 1: Exclude already Reactivated users
-            // Filter 2: Search only against AE Name
-            
             results = assignedUsers.filter(user => {
-                // If they are Reactivated, they shouldn't show here anymore
+                // If Reactivated, hide from this list
                 if (user.status === 'Reactivated') return false;
-
-                const ae = (user.assignedAE || '').toLowerCase();
-                return ae.includes(searchTerm);
+                return matchesSearch(user);
             });
 
         } else if (viewMode === 'onboarding') {
             // --- 2. Onboarding Mode ---
-            // Data Source: activePeriodData (live API)
-            // Filter 1: Status must be 'Onboarding'
-            // Filter 2: Search only against AE Name (Referral Code)
-
-            if (activePeriodData.length === 0 && !loadingSpinner.classList.contains('hidden')) return;
-
-            const processedData = processActiveData();
+            // Data Source: onboardingData (Buffer Range)
+            // Logic: Users in Buffer Range, NOT in Historical, NOT in Churn List (Reactivation)
             
-            results = processedData.filter(user => {
-                if (user.status !== 'Onboarding') return false;
+            if (onboardingData.length === 0 && !loadingSpinner.classList.contains('hidden')) return;
+            
+            const monitoredPhones = new Set(assignedUsers.map(u => u['Phone Number']));
 
-                const ae = (user.assignedAE || '').toLowerCase();
-                return ae.includes(searchTerm);
-            });
+            results = onboardingData.filter(user => {
+                const phone = user['Phone Number'];
+                
+                // If they are historical, they are NOT onboarding (they are existing)
+                if (historicalPhoneNumbers.has(phone)) return false;
+                
+                // If they are on the Churn List, they are Reactivation-based (not Onboarding)
+                if (monitoredPhones.has(phone)) return false;
+                
+                return matchesSearch(user);
+            }).map(u => ({
+                ...u,
+                assignedAE: u['Referral Code'],
+                status: 'Onboarding'
+            }));
 
         } else if (viewMode === 'activity') {
             // --- 3. Activity Mode ---
-            // Data Source: activePeriodData (live API)
-            // Filter 1: Status must be 'Organic Active' OR 'Reactivation-based' (Exclude Onboarding)
-            // Filter 2: Search only against AE Name (Referral Code)
-            
-            if (activePeriodData.length === 0 && !loadingSpinner.classList.contains('hidden')) return;
+            // Data Source: activityData (Strict Range - No Buffer)
+            // Logic: Users in Strict Range. 
+            // Classification: Must be either Reactivation-based OR Organic Active.
+            // Exclude "Onboarding" type users from this view (i.e. if not historical and not monitored, hide them)
 
-            const processedData = processActiveData();
+            if (activityData.length === 0 && !loadingSpinner.classList.contains('hidden')) return;
 
-            results = processedData.filter(user => {
-                // Exclude Onboarding
-                if (user.status === 'Onboarding') return false;
+            const monitoredPhones = new Set(assignedUsers.map(u => u['Phone Number']));
 
-                const ae = (user.assignedAE || '').toLowerCase();
-                return ae.includes(searchTerm);
+            results = activityData.filter(user => {
+                const phone = user['Phone Number'];
+                const isHistorical = historicalPhoneNumbers.has(phone);
+                const isMonitored = monitoredPhones.has(phone);
+                
+                // If neither historical nor monitored, they are effectively "Onboarding" (New)
+                // We exclude New users from the Activity tab
+                if (!isHistorical && !isMonitored) return false;
+
+                return matchesSearch(user);
+            }).map(user => {
+                const isMonitored = monitoredPhones.has(user['Phone Number']);
+                return {
+                    ...user,
+                    assignedAE: user['Referral Code'],
+                    status: isMonitored ? 'Reactivation-based' : 'Organic Active'
+                };
             });
         }
         
@@ -572,12 +580,25 @@ document.addEventListener('DOMContentLoaded', async () => {
         loadingSpinner.classList.remove('hidden');
 
         try {
-            // Buffer Date Logic
-            const startDate = new Date(startDateVal);
-            startDate.setDate(startDate.getDate() - 1); 
-
-            let limitDate = new Date(); // Default to Now
+            const retentionEndpoint = apiBase.replace('/churn', '/retention');
             
+            // Dates
+            const monitorCreationDate = new Date(startDateVal);
+            
+            // 1. Buffer Range Start (for Onboarding) - Includes 1 day buffer
+            const dateBufferStart = new Date(monitorCreationDate);
+            dateBufferStart.setDate(dateBufferStart.getDate() - 1);
+            
+            // 2. Strict Range Start (for Activity) - No buffer
+            const dateStrictStart = new Date(monitorCreationDate);
+            
+            // 3. Historical Range (360 days before creation)
+            const dateHistoricalStart = new Date(monitorCreationDate);
+            dateHistoricalStart.setDate(dateHistoricalStart.getDate() - 360);
+            const dateHistoricalEnd = new Date(monitorCreationDate);
+
+            // Shared End Date (Today + 1 day buffer)
+            let limitDate = new Date(); 
             if (monitorData.dueDate) {
                 const parts = monitorData.dueDate.split('-');
                 if (parts.length === 3) {
@@ -588,28 +609,32 @@ document.addEventListener('DOMContentLoaded', async () => {
                     }
                 }
             }
-            
-            const endDate = new Date(limitDate);
-            endDate.setDate(endDate.getDate() + 1); // Add 1 day buffer
-            
-            const startDateStr = toYYYYMMDD(startDate);
-            const endDateStr = toYYYYMMDD(endDate);
-            
-            const retentionEndpoint = apiBase.replace('/churn', '/retention');
-            const url = `${retentionEndpoint}?download=retained-user-stats&startDate=${startDateStr}&endDate=${endDateStr}`;
-            
-            // 1. Fetch full activity data
-            const results = await fetchAndParse(url);
-            
-            // 2. Set Activity Data
-            activePeriodData = results.map(row => ({
-                ...row,
-            }));
+            const currentEndDate = new Date(limitDate);
+            currentEndDate.setDate(currentEndDate.getDate() + 1); 
 
-            // 3. Update "Assigned Users" status for Reactivation View
-            const activePhoneNumbers = new Set(results.map(row => row['Phone Number']));
+            // Construct URLs
+            const urlOnboarding = `${retentionEndpoint}?download=retained-user-stats&startDate=${toYYYYMMDD(dateBufferStart)}&endDate=${toYYYYMMDD(currentEndDate)}`;
+            const urlActivity = `${retentionEndpoint}?download=retained-user-stats&startDate=${toYYYYMMDD(dateStrictStart)}&endDate=${toYYYYMMDD(currentEndDate)}`;
+            const urlHistorical = `${retentionEndpoint}?download=retained-user-stats&startDate=${toYYYYMMDD(dateHistoricalStart)}&endDate=${toYYYYMMDD(dateHistoricalEnd)}`;
+            
+            // Fetch All
+            const [resOnboarding, resActivity, resHistorical] = await Promise.all([
+                fetchAndParse(urlOnboarding),
+                fetchAndParse(urlActivity),
+                fetchAndParse(urlHistorical)
+            ]);
+            
+            // Store Data
+            onboardingData = resOnboarding;
+            activityData = resActivity;
+            historicalPhoneNumbers = new Set(resHistorical.map(u => u['Phone Number']));
+
+            // Update "Assigned Users" (Reactivation) Logic
+            // We use the STRICT activity data to determine if a user has reactivated
+            // (i.e., they must be active ON or AFTER the monitor creation date)
+            const activePhonesStrict = new Set(activityData.map(row => row['Phone Number']));
             assignedUsers.forEach(user => {
-                user.status = activePhoneNumbers.has(user['Phone Number']) ? 'Reactivated' : 'Churned';
+                user.status = activePhonesStrict.has(user['Phone Number']) ? 'Reactivated' : 'Churned';
             });
 
             handleSearch(); 
