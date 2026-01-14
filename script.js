@@ -98,6 +98,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const reportContent = document.getElementById('report-content');
     const copyReportBtn = document.getElementById('copy-report-btn');
     const closeReportBtn = document.getElementById('close-report-btn');
+    const skuToggle = document.getElementById('sku-toggle');
 
     // --- HELPER FUNCTIONS ---
     const showStatus = (message, showLoader = true) => {
@@ -273,6 +274,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     const parsedData = results.data.map(row => ({
                         ...row,
                         'Transaction Count': parseInt(row['Transaction Count'], 10) || 0,
+                        'SKU Count': parseInt(row['SKU Count'], 10) || 0,
                         'Total Amount': parseFloat(row['Total Amount']) || 0,
                     }));
 
@@ -1072,6 +1074,11 @@ Date & Time Stamp of Generated Report: ${timestamp}
     const renderTable = (data) => {
         dataTable.innerHTML = '';
         noResultsEl.classList.toggle('hidden', data.length > 0);
+        
+        // Check checkbox state for initial rendering
+        const isSkuVisible = skuToggle && skuToggle.checked;
+        const skuClass = isSkuVisible ? 'sku-column' : 'sku-column hidden';
+
         const fragment = document.createDocumentFragment();
         data.forEach((row, index) => {
             const tr = document.createElement('tr');
@@ -1085,6 +1092,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500" title="${row['Store Name'] || ''}">${truncateText(row['Store Name'])}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500" title="${row['Store Address'] || ''}">${truncateText(row['Store Address'])}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 font-medium">${row['Transaction Count']}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 font-medium ${skuClass}">${row['SKU Count']}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 font-medium">${new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(row['Total Amount'])}</td>
             `;
             fragment.appendChild(tr);
@@ -1419,6 +1427,20 @@ Date & Time Stamp of Generated Report: ${timestamp}
     closeReportBtn.addEventListener('click', hideReportModal);
     reportModalOverlay.addEventListener('click', hideReportModal);
     copyReportBtn.addEventListener('click', copyReport);
+
+    // SKU Toggle Logic
+    if (skuToggle) {
+        skuToggle.addEventListener('change', () => {
+            const cells = document.querySelectorAll('.sku-column');
+            cells.forEach(cell => {
+                if (skuToggle.checked) {
+                    cell.classList.remove('hidden');
+                } else {
+                    cell.classList.add('hidden');
+                }
+            });
+        });
+    }
 
     cohortToggle.addEventListener('change', () => {
         const isChecked = cohortToggle.checked;
