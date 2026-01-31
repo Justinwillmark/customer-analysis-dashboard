@@ -1502,7 +1502,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
     exportBtn.addEventListener('click', () => {
         if (filteredData.length === 0) { alert('No data to export.'); return; }
         const csv = Papa.unparse(filteredData, {
-            columns: ['First Name', 'Last Name', 'Phone Number', 'Referral Code', 'LGA', 'Store Name', 'Store Address', 'Transaction Count', 'Total Amount']
+            columns: ['First Name', 'Last Name', 'Phone Number', 'Referral Code', 'LGA', 'Store Name', 'Store Address', 'Transaction Count', 'SKU Count', 'Total Amount']
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
