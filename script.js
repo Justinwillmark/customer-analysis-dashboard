@@ -1097,6 +1097,32 @@ Date & Time Stamp of Generated Report: ${timestamp}
             `;
             fragment.appendChild(tr);
         });
+
+        // NEW: Calculate Totals based on filtered data
+        const totalTxn = data.reduce((sum, row) => sum + (row['Transaction Count'] || 0), 0);
+        const totalSku = data.reduce((sum, row) => sum + (row['SKU Count'] || 0), 0);
+        const totalAmt = data.reduce((sum, row) => sum + (row['Total Amount'] || 0), 0);
+
+        // NEW: Create Grand Total Row
+        if (data.length > 0) {
+            const totalRow = document.createElement('tr');
+            totalRow.className = 'bg-slate-50 font-bold border-t-2 border-slate-300';
+            totalRow.innerHTML = `
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 hidden md:table-cell"></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-800">Grand Total:</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800">${new Intl.NumberFormat('en-US').format(totalTxn)}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 ${skuClass}">${new Intl.NumberFormat('en-US').format(totalSku)}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800">${new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(totalAmt)}</td>
+            `;
+            fragment.appendChild(totalRow);
+        }
+
         dataTable.appendChild(fragment);
     };
 
