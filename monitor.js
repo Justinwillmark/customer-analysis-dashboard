@@ -603,7 +603,12 @@ document.addEventListener('DOMContentLoaded', async () => {
                 const parts = monitorData.dueDate.split('-');
                 if (parts.length === 3) {
                     const dueEnd = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+                    // STOP COUNTING FIX: Shift the deadline back to the previous day
+                    // This ensures that when the status is "Overdue" (reached the due date),
+                    // no new data from the due date itself is included.
+                    dueEnd.setDate(dueEnd.getDate() - 1);
                     dueEnd.setHours(23, 59, 59, 999);
+                    
                     if (limitDate > dueEnd) {
                         limitDate = dueEnd;
                     }
