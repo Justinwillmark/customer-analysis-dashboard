@@ -271,7 +271,21 @@ document.addEventListener('DOMContentLoaded', () => {
                 header: true,
                 skipEmptyLines: true,
                 complete: (results) => {
-                    const parsedData = results.data.map(row => ({
+                    // NEW: Filter out "Grand Total" rows or rows with empty Phone Numbers
+                    const validRows = results.data.filter(row => {
+                         const phone = row['Phone Number'];
+                         const name = row['First Name'];
+                         
+                         // Must have a phone number (key identifier)
+                         if (!phone || typeof phone !== 'string' || phone.trim() === '') return false;
+                         
+                         // Explicitly exclude rows labeled "Grand Total" or "Total"
+                         if (name && /^(grand )?total$/i.test(name.trim())) return false;
+                         
+                         return true;
+                    });
+
+                    const parsedData = validRows.map(row => ({
                         ...row,
                         'Transaction Count': parseInt(row['Transaction Count'], 10) || 0,
                         'SKU Count': parseInt(row['SKU Count'], 10) || 0,
@@ -439,6 +453,9 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const retentionRate = usersP1PhoneNumbers.size > 0 ? (retainedUsersSet.size / usersP1PhoneNumbers.size * 100).toFixed(1) : 0;
         
+        // --- NEW: Calculate High Frequency Users (More than 10 transactions) ---
+        const highFreqCount = dataPeriod2.filter(u => (u['Transaction Count'] || 0) > 10).length;
+
         document.getElementById('retention-rate').textContent = `${retentionRate}%`;
         document.getElementById('retained-users').textContent = retainedUsersSet.size;
         document.getElementById('new-users').textContent = newUsersSet.size;
@@ -486,6 +503,7 @@ document.addEventListener('DOMContentLoaded', () => {
             newUsers: newUsersSet.size,
             churnedUsers: churnedData.length,
             totalActiveUsers: usersP2PhoneNumbers.size,
+            highFreqCount: highFreqCount, // Stored for report
             period1Text: period1Text,
             period2Text: period2Text,
             periodLabel: period2Label,
@@ -537,6 +555,8 @@ Date & Time Stamp of Generated Report: ${timestamp}
 
 - Total Active Users: In total, there were ${reportData.totalActiveUsers} active users during ${durationP2}.
 
+- Transaction Frequency: Of the ${reportData.totalActiveUsers} total active users in ${durationP2}, only ${reportData.highFreqCount} recorded sales more than 10 times in total.
+
 Verification Link:
 ${analysisUrl}`;
 
@@ -552,7 +572,9 @@ Date & Time Stamp of Generated Report: ${timestamp}
 
 - Churn: ${reportData.churnedUsers} users from the first file were missing from the second file.
 
-- Total Active Users: The second file contains a total of ${reportData.totalActiveUsers} users.`;
+- Total Active Users: The second file contains a total of ${reportData.totalActiveUsers} users.
+
+- Transaction Frequency: Of the ${reportData.totalActiveUsers} total active users in the second file, only ${reportData.highFreqCount} recorded sales more than 10 times in total.`;
         }
         
         reportContent.textContent = summaryText;
