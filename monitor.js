@@ -20,6 +20,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const timeRemainingCard = document.getElementById('time-remaining-card');
     const viewAsAdminBtn = document.getElementById('view-as-admin-btn');
     const copyAgentLinkBtn = document.getElementById('copy-agent-link-btn');
+    const exportMonitorCsvBtn = document.getElementById('export-monitor-csv-btn'); // Export CSV Button
     const adminLoginOverlay = document.getElementById('admin-login-overlay');
     const adminLoginForm = document.getElementById('admin-login-form');
     const adminPasswordInput = document.getElementById('admin-password-input');
@@ -34,6 +35,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     // State
     let monitorData = null;
     let assignedUsers = [];
+    let currentRenderedData = []; // Track currently displayed data for export
     
     // Split Data Sets
     let onboardingData = []; // Buffer Range: Creation - 1 Day to Now
@@ -292,6 +294,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const renderTable = (usersToRender) => {
+        currentRenderedData = usersToRender; // Update current data for export
         monitorTable.innerHTML = '';
         monitorMobileList.innerHTML = ''; // Clear mobile list
         noResults.classList.add('hidden');
@@ -657,6 +660,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const updateViewMode = () => {
         if (isAgentView) {
             copyAgentLinkBtn.classList.add('hidden');
+            exportMonitorCsvBtn.classList.add('hidden'); // Hide Export Button in Agent View
             viewAsAdminBtn.classList.remove('hidden');
             timeRemainingCard.classList.remove('hidden'); 
             searchInput.value = '';
@@ -664,6 +668,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             renderTable([]);
         } else {
             copyAgentLinkBtn.classList.remove('hidden');
+            exportMonitorCsvBtn.classList.remove('hidden'); // Show Export Button in Admin View
             viewAsAdminBtn.classList.add('hidden');
             reactivatedCard.classList.remove('hidden');
             timeRemainingCard.classList.remove('hidden');
@@ -721,6 +726,38 @@ document.addEventListener('DOMContentLoaded', async () => {
                 copyAgentLinkBtn.classList.remove('bg-gray-700', 'hover:bg-gray-800');
             }, 2000);
         });
+    });
+
+    // --- Export CSV Logic ---
+    exportMonitorCsvBtn.addEventListener('click', () => {
+        if (!currentRenderedData || currentRenderedData.length === 0) {
+            alert('No data to export.');
+            return;
+        }
+
+        // Prepare data for export
+        const csvData = currentRenderedData.map(u => ({
+            'First Name': u['First Name'],
+            'Last Name': u['Last Name'],
+            'Phone Number': u['Phone Number'],
+            'Date': formatDate(u['Created Date']),
+            'Store Name': u['Store Name'] || '',
+            'LGA': u['LGA'] || '',
+            'Address': u['Store Address'] || '',
+            'Assigned AE': u.assignedAE || '',
+            'Status': u.status || ''
+        }));
+
+        const csv = Papa.unparse(csvData);
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const link = document.createElement('a');
+        const url = URL.createObjectURL(blob);
+        link.setAttribute('href', url);
+        link.setAttribute('download', `monitor-export-${new Date().toISOString().split('T')[0]}.csv`);
+        link.style.visibility = 'hidden';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
     });
 
     // Initialization
