@@ -5,6 +5,22 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Pika Retention & Analysis Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            850: '#1e293b', // Custom darker slate
+                            900: '#0f172a',
+                            950: '#020617',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/chartjs-plugin-annotation/1.4.0/chartjs-plugin-annotation.min.js"></script>
@@ -15,21 +31,28 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
-<body class="text-slate-800">
+<body class="text-slate-800 bg-slate-50 dark:bg-slate-950 dark:text-slate-200 transition-colors duration-300">
+
+    <div id="animated-bg" class="fixed inset-0 z-0 pointer-events-none overflow-hidden opacity-40 dark:opacity-20">
+        <div class="bg-shape shape-1"></div>
+        <div class="bg-shape shape-2"></div>
+        <div class="bg-shape shape-3"></div>
+        <div class="bg-shape shape-4"></div>
+    </div>
 
     <div id="login-overlay" class="fixed inset-0 z-50 flex items-center justify-center">
-        <div class="login-card">
+        <div class="login-card dark:bg-slate-800 dark:border dark:border-slate-700">
             <div class="login-icon">
                 <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-12 h-12">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z" />
                 </svg>
             </div>
-            <h2 class="text-2xl font-bold text-center text-slate-800">Access Pika-RS Dashboard</h2>
-            <p class="text-sm text-slate-500 text-center">Please enter the password to continue.</p>
+            <h2 class="text-2xl font-bold text-center text-slate-800 dark:text-white">Access Pika-RS Dashboard</h2>
+            <p class="text-sm text-slate-500 dark:text-slate-400 text-center">Please enter the password to continue.</p>
             <form id="login-form" class="mt-6 space-y-4">
                 <div>
                     <label for="password-input" class="sr-only">Password</label>
-                    <input type="password" id="password-input" placeholder="Password" class="login-input">
+                    <input type="password" id="password-input" placeholder="Password" class="login-input dark:bg-slate-700 dark:border-slate-600 dark:text-white dark:placeholder-slate-400">
                 </div>
                 <button type="submit" class="login-button">Unlock</button>
             </form>
@@ -38,44 +61,54 @@
     </div>
 
 
-    <div id="loading-overlay" class="fixed inset-0 bg-slate-900 bg-opacity-30 z-40 hidden items-center justify-center">
-        <div class="loader-card">
+    <div id="loading-overlay" class="fixed inset-0 bg-slate-900 bg-opacity-30 z-40 hidden items-center justify-center backdrop-blur-sm">
+        <div class="loader-card dark:bg-slate-800 dark:border dark:border-slate-700">
             <div class="loader"></div>
-            <p class="text-slate-600 font-medium">Fetching & Analyzing Data...</p>
+            <p class="text-slate-600 dark:text-slate-300 font-medium">Fetching & Analyzing Data...</p>
         </div>
     </div>
 
 
-    <div id="app" class="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto hidden">
+    <div id="app" class="relative z-10 p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto hidden">
 
-        <header class="mb-8 text-center">
-            <h1 class="text-4xl font-bold text-slate-900 main-title">Retention & Analysis Dashboard</h1>
-            <p class="text-slate-500 mt-2 max-w-2xl mx-auto">Use the API fetch for cohort and churn analysis or upload files for comparison.</p>
+        <header class="mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
+            <div class="text-center md:text-left">
+                <h1 class="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white main-title">Retention & Analysis Dashboard</h1>
+                <p class="text-slate-500 dark:text-slate-400 mt-2">Use the API fetch for cohort and churn analysis or upload files for comparison.</p>
+            </div>
+            <button id="theme-toggle" class="p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
+                <svg id="sun-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                </svg>
+                <svg id="moon-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 block dark:hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                </svg>
+            </button>
         </header>
 
-        <details class="file-upload-details bg-slate-50 rounded-xl border border-slate-200 mb-8">
-            <summary class="file-upload-summary">Upload CSV Files for Comparison</summary>
+        <details class="file-upload-details bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-8 shadow-sm">
+            <summary class="file-upload-summary dark:text-slate-200 dark:hover:bg-slate-700">Upload CSV Files for Comparison</summary>
             <div class="p-6">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div id="upload-container-1" class="file-input-container rounded-lg p-6 text-center">
+                    <div id="upload-container-1" class="file-input-container rounded-lg p-6 text-center dark:border-slate-600">
                         <input type="file" id="csv-file-1" class="hidden" accept=".csv">
                         <label for="csv-file-1" class="cursor-pointer">
                             <div class="flex flex-col items-center justify-center space-y-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                                <p class="font-semibold text-slate-700">Upload Period 1 File</p>
-                                <p id="file-name-1" class="text-sm text-slate-500">Drag & drop or click to upload</p>
-                                <p id="date-range-1" class="text-sm font-semibold text-blue-600"></p>
+                                <p class="font-semibold text-slate-700 dark:text-slate-300">Upload Period 1 File</p>
+                                <p id="file-name-1" class="text-sm text-slate-500 dark:text-slate-400">Drag & drop or click to upload</p>
+                                <p id="date-range-1" class="text-sm font-semibold text-blue-600 dark:text-blue-400"></p>
                             </div>
                         </label>
                     </div>
-                    <div id="upload-container-2" class="file-input-container rounded-lg p-6 text-center disabled">
+                    <div id="upload-container-2" class="file-input-container rounded-lg p-6 text-center disabled dark:bg-slate-800 dark:border-slate-700">
                         <input type="file" id="csv-file-2" class="hidden" accept=".csv" disabled>
                         <label for="csv-file-2" id="upload-label-2" class="cursor-not-allowed">
                             <div class="flex flex-col items-center justify-center space-y-2">
                                 <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                                <p class="font-semibold text-slate-700">Upload Period 2 File</p>
-                                <p id="file-name-2" class="text-sm text-slate-500">Upload Period 1 file first</p>
-                                <p id="date-range-2" class="text-sm font-semibold text-green-600"></p>
+                                <p class="font-semibold text-slate-700 dark:text-slate-300">Upload Period 2 File</p>
+                                <p id="file-name-2" class="text-sm text-slate-500 dark:text-slate-400">Upload Period 1 file first</p>
+                                <p id="date-range-2" class="text-sm font-semibold text-green-600 dark:text-green-400"></p>
                             </div>
                         </label>
                     </div>
@@ -83,17 +116,17 @@
             </div>
         </details>
 
-        <details class="api-details bg-slate-50 rounded-xl border border-slate-200 mb-8" open>
-            <summary class="api-summary">Alternative: Fetch from API Endpoint</summary>
+        <details class="api-details bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-8 shadow-sm" open>
+            <summary class="api-summary dark:text-slate-200 dark:hover:bg-slate-700">Alternative: Fetch from API Endpoint</summary>
             <div class="p-6">
                 <div class="grid grid-cols-1 gap-6">
                     <div>
-                        <label for="api-url" class="block text-sm font-medium text-slate-700">Base API URL</label>
-                        <input type="text" id="api-url" class="mt-1 block w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" value="https://pika-inventory-94729b833f18.herokuapp.com/api/v1/admin/analytics/retention">
+                        <label for="api-url" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Base API URL</label>
+                        <input type="text" id="api-url" class="mt-1 block w-full border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" value="https://pika-inventory-94729b833f18.herokuapp.com/api/v1/admin/analytics/retention">
                     </div>
 
                     <div class="flex items-center justify-end gap-3">
-                         <label for="cohort-toggle" class="text-sm font-medium text-slate-700">Use Cohort Comparison</label>
+                         <label for="cohort-toggle" class="text-sm font-medium text-slate-700 dark:text-slate-300">Use Cohort Comparison</label>
                          <label class="toggle-switch">
                             <input type="checkbox" id="cohort-toggle">
                             <span class="slider"></span>
@@ -103,22 +136,22 @@
                     <div id="cohort-inputs" class="hidden">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <div>
-                                <h4 class="text-sm font-medium text-slate-700 mb-2">Period 1 Date Range</h4>
+                                <h4 class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Period 1 Date Range</h4>
                                 <div class="flex items-center gap-2 mb-3" id="api-presets-1"></div>
                                 <div class="flex items-center gap-2">
-                                    <input type="date" id="api-start-1" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+                                    <input type="date" id="api-start-1" class="w-full border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
                                     <span class="text-slate-400">to</span>
-                                    <input type="date" id="api-end-1" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+                                    <input type="date" id="api-end-1" class="w-full border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
                                 </div>
                                 <div id="date-display-1" class="mt-3"></div>
                             </div>
                             <div>
-                                <h4 class="text-sm font-medium text-slate-700 mb-2">Period 2 Date Range</h4>
+                                <h4 class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Period 2 Date Range</h4>
                                 <div class="flex items-center gap-2 mb-3" id="api-presets-2"></div>
                                 <div class="flex items-center gap-2">
-                                    <input type="date" id="api-start-2" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+                                    <input type="date" id="api-start-2" class="w-full border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
                                     <span class="text-slate-400">to</span>
-                                    <input type="date" id="api-end-2" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+                                    <input type="date" id="api-end-2" class="w-full border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
                                 </div>
                                 <div id="date-display-2" class="mt-3"></div>
                             </div>
@@ -127,12 +160,12 @@
 
                     <div id="churn-inputs">
                         <div>
-                             <h4 class="text-sm font-medium text-slate-700 mb-2">Select time period to compare with activity in the 30 days prior</h4>
+                             <h4 class="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">Select time period to compare with activity in the 30 days prior</h4>
                              <div class="flex items-center gap-2 mb-3" id="api-presets-churn"></div>
                              <div class="flex items-center gap-2">
-                                <input type="date" id="api-start-churn" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+                                <input type="date" id="api-start-churn" class="w-full border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
                                 <span class="text-slate-400">to</span>
-                                <input type="date" id="api-end-churn" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+                                <input type="date" id="api-end-churn" class="w-full border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
                              </div>
                              <div id="date-display-churn" class="mt-3"></div>
                         </div>
@@ -148,92 +181,161 @@
         <div id="status-container" class="text-center my-8 hidden">
              <div class="flex justify-center items-center space-x-3">
                  <div id="loader" class="loader"></div>
-                 <p id="status-message" class="text-lg font-medium text-slate-600"></p>
+                 <p id="status-message" class="text-lg font-medium text-slate-600 dark:text-slate-300"></p>
              </div>
         </div>
 
         <div id="dashboard" class="hidden">
             <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4 sm:gap-6 mb-8">
-                <div id="retention-rate-card" class="metric-card bg-white p-5 rounded-xl shadow-sm">
+                <div id="retention-rate-card" class="metric-card bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
                     <div class="flex justify-between items-center">
-                        <h3 class="text-sm font-medium text-slate-500">Retention Rate</h3>
+                        <h3 class="text-sm font-medium text-slate-500 dark:text-slate-400">Retention Rate</h3>
                         <svg id="report-info-icon" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400 hover:text-blue-600 cursor-pointer transition-colors duration-200 hidden" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                     </div>
-                    <p id="retention-rate" class="metric-value text-3xl font-bold mt-1"></p>
+                    <p id="retention-rate" class="metric-value text-3xl font-bold mt-1 dark:text-white"></p>
                 </div>
-                <div class="metric-card bg-white p-5 rounded-xl shadow-sm has-popup"><h3 class="text-sm font-medium text-slate-500">Retained Users</h3><p id="retained-users" class="metric-value text-3xl font-bold mt-1"></p><p id="retained-when" class="text-xs text-slate-400 mt-1"></p><div id="retained-popup" class="card-popup"></div></div>
-                <div class="metric-card bg-white p-5 rounded-xl shadow-sm has-popup"><h3 class="text-sm font-medium text-slate-500">New Users</h3><p id="new-users" class="metric-value text-3xl font-bold mt-1"></p><p id="new-when" class="text-xs text-slate-400 mt-1"></p><div id="new-popup" class="card-popup"></div></div>
-                <div id="churned-users-card" class="metric-card bg-white p-5 rounded-xl shadow-sm has-popup"><h3 class="text-sm font-medium text-slate-500">Churned Users</h3><p id="churned-users" class="metric-value text-3xl font-bold mt-1"></p><p id="churned-when" class="text-xs text-slate-400 mt-1"></p><div id="churned-popup" class="card-popup"></div></div>
-                <div class="metric-card bg-white p-5 rounded-xl shadow-sm has-popup"><h3 class="text-sm font-medium text-slate-500">Total Active Users</h3><p id="total-users" class="metric-value text-3xl font-bold mt-1"></p><p id="total-when" class="text-xs text-slate-400 mt-1"></p><div id="total-popup" class="card-popup"></div></div>
+                <div class="metric-card bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 has-popup"><h3 class="text-sm font-medium text-slate-500 dark:text-slate-400">Retained Users</h3><p id="retained-users" class="metric-value text-3xl font-bold mt-1 dark:text-white"></p><p id="retained-when" class="text-xs text-slate-400 mt-1"></p><div id="retained-popup" class="card-popup"></div></div>
+                <div class="metric-card bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 has-popup"><h3 class="text-sm font-medium text-slate-500 dark:text-slate-400">New Users</h3><p id="new-users" class="metric-value text-3xl font-bold mt-1 dark:text-white"></p><p id="new-when" class="text-xs text-slate-400 mt-1"></p><div id="new-popup" class="card-popup"></div></div>
+                <div id="churned-users-card" class="metric-card bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 has-popup"><h3 class="text-sm font-medium text-slate-500 dark:text-slate-400">Churned Users</h3><p id="churned-users" class="metric-value text-3xl font-bold mt-1 dark:text-white"></p><p id="churned-when" class="text-xs text-slate-400 mt-1"></p><div id="churned-popup" class="card-popup"></div></div>
+                <div class="metric-card bg-white dark:bg-slate-800 p-5 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 has-popup"><h3 class="text-sm font-medium text-slate-500 dark:text-slate-400">Total Active Users</h3><p id="total-users" class="metric-value text-3xl font-bold mt-1 dark:text-white"></p><p id="total-when" class="text-xs text-slate-400 mt-1"></p><div id="total-popup" class="card-popup"></div></div>
             </div>
 
             <div class="grid grid-cols-1 gap-8 mb-8">
-                <div class="bg-white p-6 rounded-xl shadow-sm">
-                    <h3 class="font-semibold mb-4 text-center text-slate-700">User Overview & Retention (90-Day Trend)</h3>
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                    <h3 class="font-semibold mb-4 text-center text-slate-700 dark:text-slate-200">User Overview & Retention (90-Day Trend)</h3>
                     <div class="h-96">
                         <canvas id="user-chart"></canvas>
                     </div>
                 </div>
-                <div class="bg-white p-6 rounded-xl shadow-sm">
-                    <h3 class="font-semibold mb-4 text-center text-slate-700">Transaction Comparison (90-Day Trend)</h3>
+                <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                    <h3 class="font-semibold mb-4 text-center text-slate-700 dark:text-slate-200">Transaction Comparison (90-Day Trend)</h3>
                      <div class="h-96">
                         <canvas id="transaction-chart"></canvas>
                     </div>
                 </div>
             </div>
 
-            <div class="bg-white p-6 rounded-xl shadow-sm">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-4">
-                    <div>
-                        <h3 id="table-title" class="text-xl font-semibold">User Data</h3>
-                        <p id="table-description" class="text-sm text-slate-500 mt-1">Select a period to see user data.</p>
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                <div class="mb-6">
+                    <div class="mb-4">
+                        <h3 id="table-title" class="text-2xl font-bold text-slate-800 dark:text-white">User Data</h3>
+                        <p id="table-description" class="text-sm text-slate-500 dark:text-slate-400 mt-1">Select a period to see user data.</p>
                     </div>
-                    <div class="flex flex-col sm:flex-row items-end gap-4 w-full sm:w-auto">
-                        <div class="w-full sm:w-48">
-                            <label for="search-input" class="block text-sm font-medium text-slate-700">Search Users</label>
-                            <input type="text" id="search-input" placeholder="Name, phone..." class="mt-1 block w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
-                        </div>
-                        <div class="w-full sm:w-64">
-                            <label for="transaction-filter" class="block text-sm font-medium text-slate-700">Filter by Transaction Count</label>
-                            <div class="flex items-center gap-2 mt-1">
-                                <input type="number" id="min-trans" placeholder="Min" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
-                                <span class="text-slate-400">-</span>
-                                <input type="number" id="max-trans" placeholder="Max" class="w-full border-slate-300 rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2">
+
+                    <div class="flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between">
+                        <div class="w-full lg:w-auto flex-grow max-w-2xl">
+                            <label for="search-input" class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Search Database</label>
+                            <div class="search-group flex shadow-sm rounded-md">
+                                <div class="relative">
+                                    <select id="search-column-select" class="h-10 pl-3 pr-8 py-2 bg-slate-50 dark:bg-slate-700 border border-slate-300 dark:border-slate-600 border-r-0 rounded-l-md text-sm text-slate-700 dark:text-slate-200 font-medium focus:ring-blue-500 focus:border-blue-500 cursor-pointer hover:bg-slate-100 dark:hover:bg-slate-600 transition-colors outline-none appearance-none">
+                                        <option value="all">All Columns</option>
+                                        <option value="First Name">First Name</option>
+                                        <option value="Last Name">Last Name</option>
+                                        <option value="Phone Number">Phone Number</option>
+                                        <option value="Referral Code">Referral Code</option>
+                                        <option value="State">State</option>
+                                        <option value="Store Name">Store Name</option>
+                                        <option value="Store Type">Store Type</option>
+                                        <option value="LGA">LGA</option>
+                                    </select>
+                                    <div class="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-slate-500">
+                                        <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                            <path fill-rule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clip-rule="evenodd" />
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="relative flex-grow">
+                                    <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                        <svg class="h-4 w-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                                        </svg>
+                                    </div>
+                                    <input type="text" id="search-input" placeholder="Type to search..." class="h-10 block w-full pl-10 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white dark:placeholder-slate-400 rounded-r-md focus:ring-blue-500 focus:border-blue-500 text-sm">
+                                </div>
                             </div>
                         </div>
-                        <div class="pb-2">
-                            <label class="inline-flex items-center cursor-pointer select-none">
-                                <input type="checkbox" id="sku-toggle" class="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500">
-                                <span class="ml-2 text-sm font-medium text-slate-700">Show SKU Count</span>
-                            </label>
+
+                        <div class="flex flex-col sm:flex-row gap-3 w-full lg:w-auto items-end">
+                            
+                            <div class="w-full sm:w-auto">
+                                <label class="block text-xs font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wide mb-1">Trans. Count</label>
+                                <div class="flex items-center">
+                                    <input type="number" id="min-trans" placeholder="Min" class="h-10 w-20 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-l-md focus:ring-blue-500 focus:border-blue-500 text-sm text-center">
+                                    <div class="bg-slate-100 dark:bg-slate-600 border-t border-b border-slate-300 dark:border-slate-500 px-2 h-10 flex items-center text-slate-500 dark:text-slate-300 text-xs">-</div>
+                                    <input type="number" id="max-trans" placeholder="Max" class="h-10 w-20 border border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-r-md focus:ring-blue-500 focus:border-blue-500 text-sm text-center">
+                                </div>
+                            </div>
+
+                            <div class="relative z-10">
+                                <details class="column-dropdown group">
+                                    <summary class="h-10 flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 transition select-none shadow-sm whitespace-nowrap">
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
+                                        </svg>
+                                        <span>Columns</span>
+                                        <svg xmlns="http://www.w3.org/2000/svg" class="h-3 w-3 ml-1 text-slate-400 group-open:rotate-180 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </summary>
+                                    <div class="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg border border-slate-200 dark:border-slate-600 p-2 z-20">
+                                        <div class="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Visible Columns</div>
+                                        <label class="flex items-center gap-2 px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded cursor-pointer">
+                                            <input type="checkbox" id="sku-toggle" class="w-4 h-4 text-blue-600 border-gray-300 dark:border-slate-500 rounded focus:ring-blue-500 dark:bg-slate-700">
+                                            <span class="text-sm text-slate-700 dark:text-slate-300">SKU Count</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded cursor-pointer">
+                                            <input type="checkbox" id="state-toggle" class="w-4 h-4 text-blue-600 border-gray-300 dark:border-slate-500 rounded focus:ring-blue-500 dark:bg-slate-700">
+                                            <span class="text-sm text-slate-700 dark:text-slate-300">State</span>
+                                        </label>
+                                        <label class="flex items-center gap-2 px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded cursor-pointer">
+                                            <input type="checkbox" id="store-type-toggle" class="w-4 h-4 text-blue-600 border-gray-300 dark:border-slate-500 rounded focus:ring-blue-500 dark:bg-slate-700">
+                                            <span class="text-sm text-slate-700 dark:text-slate-300">Store Type</span>
+                                        </label>
+                                    </div>
+                                </details>
+                            </div>
+
+                            <div>
+                                <button id="export-csv" class="h-10 bg-blue-600 text-white font-semibold px-5 rounded-md hover:bg-blue-700 transition shadow-sm flex items-center gap-2 whitespace-nowrap">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                    </svg>
+                                    Export
+                                </button>
+                            </div>
                         </div>
-                        <button id="export-csv" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 transition h-fit">Export CSV</button>
                     </div>
                 </div>
+
                 <div class="relative">
-                    <div id="table-scroll-container" class="overflow-x-auto">
-                        <table class="min-w-full divide-y divide-slate-200">
-                            <thead class="bg-slate-50">
+                    <div id="table-scroll-container" class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                        <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
+                            <thead class="bg-slate-50 dark:bg-slate-700/50">
                                 <tr>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">#</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">First Name</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Last Name</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Phone Number</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider hidden md:table-cell">Referral Code</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">LGA</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Store Name</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Store Address</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Transaction Count</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider sku-column hidden">SKU Count</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">Total Amount</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">#</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">First Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Last Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Phone Number</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden md:table-cell">Referral Code</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">LGA</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider state-column hidden">State</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Store Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider store-type-column hidden">Store Type</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Store Address</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Transaction Count</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider sku-column hidden">SKU Count</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Total Amount</th>
                                 </tr>
                             </thead>
-                            <tbody id="data-table" class="bg-white divide-y divide-slate-200">
+                            <tbody id="data-table" class="bg-white dark:bg-slate-800 divide-y divide-slate-200 dark:divide-slate-700">
                                 </tbody>
                         </table>
-                         <p id="no-results" class="text-center py-8 text-slate-500 hidden">No users match the current filter.</p>
+                         <p id="no-results" class="text-center py-12 text-slate-500 dark:text-slate-400 hidden">
+                             <span class="block text-4xl mb-2 opacity-50">🔍</span>
+                             No users match the current filter.
+                         </p>
                     </div>
                     <div id="scroll-hint-arrow"></div>
                 </div>
@@ -241,13 +343,13 @@
         </div>
     </div>
 
-    <div id="report-modal-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden"></div>
-    <div id="report-modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white rounded-lg shadow-xl z-50 w-full max-w-lg p-6 hidden">
-        <h2 class="text-lg font-bold mb-4 text-slate-800">Report Summary</h2>
-        <div id="report-content" class="bg-slate-50 border border-slate-200 p-4 rounded-md mb-6 text-sm whitespace-pre-wrap font-mono text-slate-700 overflow-x-auto"></div>
+    <div id="report-modal-overlay" class="fixed inset-0 bg-black bg-opacity-50 z-40 hidden backdrop-blur-sm"></div>
+    <div id="report-modal" class="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-white dark:bg-slate-800 rounded-lg shadow-xl z-50 w-full max-w-lg p-6 hidden">
+        <h2 class="text-lg font-bold mb-4 text-slate-800 dark:text-white">Report Summary</h2>
+        <div id="report-content" class="bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 p-4 rounded-md mb-6 text-sm whitespace-pre-wrap font-mono text-slate-700 dark:text-slate-300 overflow-x-auto"></div>
         <div class="flex justify-end gap-4">
              <button id="copy-report-btn" class="bg-blue-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-blue-700 transition">Copy Report</button>
-             <button id="close-report-btn" class="bg-slate-200 text-slate-800 font-semibold py-2 px-4 rounded-md hover:bg-slate-300 transition">Close</button>
+             <button id="close-report-btn" class="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white font-semibold py-2 px-4 rounded-md hover:bg-slate-300 dark:hover:bg-slate-600 transition">Close</button>
         </div>
     </div>
 

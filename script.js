@@ -38,6 +38,27 @@ document.addEventListener('DOMContentLoaded', () => {
     loginForm.addEventListener('submit', handleLogin);
     checkLogin();
 
+    // --- DARK MODE LOGIC ---
+    const themeToggle = document.getElementById('theme-toggle');
+    const htmlElement = document.documentElement;
+
+    // Check saved preference or system preference
+    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+        htmlElement.classList.add('dark');
+    } else {
+        htmlElement.classList.remove('dark');
+    }
+
+    themeToggle.addEventListener('click', () => {
+        if (htmlElement.classList.contains('dark')) {
+            htmlElement.classList.remove('dark');
+            localStorage.theme = 'light';
+        } else {
+            htmlElement.classList.add('dark');
+            localStorage.theme = 'dark';
+        }
+    });
+
     // --- STATE MANAGEMENT & CONSTANTS ---
     let dataPeriod1 = [];
     let dataPeriod2 = [];
@@ -89,6 +110,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const minTransInput = document.getElementById('min-trans');
     const maxTransInput = document.getElementById('max-trans');
     const searchInput = document.getElementById('search-input');
+    const searchColumnSelect = document.getElementById('search-column-select');
     const exportBtn = document.getElementById('export-csv');
     const noResultsEl = document.getElementById('no-results');
     const tableDescription = document.getElementById('table-description');
@@ -99,6 +121,8 @@ document.addEventListener('DOMContentLoaded', () => {
     const copyReportBtn = document.getElementById('copy-report-btn');
     const closeReportBtn = document.getElementById('close-report-btn');
     const skuToggle = document.getElementById('sku-toggle');
+    const stateToggle = document.getElementById('state-toggle');
+    const storeTypeToggle = document.getElementById('store-type-toggle');
 
     // --- HELPER FUNCTIONS ---
     const showStatus = (message, showLoader = true) => {
@@ -290,6 +314,8 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Transaction Count': parseInt(row['Transaction Count'], 10) || 0,
                         'SKU Count': parseInt(row['SKU Count'], 10) || 0,
                         'Total Amount': parseFloat(row['Total Amount']) || 0,
+                        'State': row['State'] || 'N/A', // Pick up State
+                        'Store Type': row['Store Type'] || 'N/A' // Pick up Store Type
                     }));
 
                     if (period === 1) dataPeriod1 = parsedData;
@@ -663,14 +689,15 @@ Date & Time Stamp of Generated Report: ${timestamp}
                 expandChurnPopup(container, title, data);
             });
             buttonsWrapper.appendChild(viewAllBtn);
-        } else if (popupId === 'retained-popup') {
+        } else if (popupId === 'retained-popup' || popupId === 'total-popup') {
              // --- NEW: Add AE Retention View Button ---
              const viewAeBtn = document.createElement('button');
              viewAeBtn.textContent = 'AE Analysis';
              viewAeBtn.className = 'popup-action-btn';
              viewAeBtn.addEventListener('click', (e) => {
                  e.stopPropagation();
-                 expandRetentionPopup(container, title, data);
+                 const viewTitle = popupId === 'retained-popup' ? 'AE Retention View' : 'AE Performance View (Total)';
+                 expandRetentionPopup(container, viewTitle, data);
              });
              buttonsWrapper.appendChild(viewAeBtn);
         }
@@ -736,8 +763,8 @@ Date & Time Stamp of Generated Report: ${timestamp}
         managementHeader.className = 'management-header';
         managementHeader.innerHTML = `
             <div class="flex flex-col">
-                <h3 class="management-title">AE Retention View</h3>
-                <p class="text-xs text-slate-500">Breakdown of retained merchants by Account Executive (${periodText}).</p>
+                <h3 class="management-title">${title}</h3>
+                <p class="text-xs text-slate-500">Breakdown of merchants by Account Executive (${periodText}).</p>
             </div>
         `;
 
@@ -750,7 +777,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
                 <thead>
                     <tr>
                         <th>AE Name / Referral</th>
-                        <th class="text-center">Retained Users</th>
+                        <th class="text-center">Users Count</th>
                         <th class="text-right">Total Sales (P2)</th>
                         <th class="text-right">vs Prior Period</th>
                         <th class="text-center">Txn Count</th>
@@ -798,7 +825,8 @@ Date & Time Stamp of Generated Report: ${timestamp}
                 container.classList.remove('fullscreen');
                 document.body.classList.remove('fullscreen-active');
             }
-            createPopupTable('retained-popup', title, data);
+            // Re-render the original table
+            createPopupTable(container.id, container.id === 'retained-popup' ? 'Retained Users' : 'Total Active Users', data);
         });
 
         const copyButton = document.createElement('button');
@@ -806,7 +834,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
         copyButton.className = 'popup-copy-button';
         copyButton.addEventListener('click', (e) => {
             e.stopPropagation();
-            const headers = "AE Name\tRetained Users\tTotal Sales (P2)\tPrevious Sales (P1)\tTransaction Count\n";
+            const headers = "AE Name\tUsers Count\tTotal Sales (P2)\tPrevious Sales (P1)\tTransaction Count\n";
             const tsv = sortedStats.map(stat => {
                 return `${stat.name}\t${stat.users}\t${stat.amount}\t${stat.p1Amount}\t${stat.txns}`;
             }).join('\n');
@@ -828,8 +856,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
         container.appendChild(managementHeader);
         container.appendChild(tableContainer);
         container.appendChild(footer);
-
-        // CHANGED: Fullscreen logic removed for AE Retention View as per request
     };
 
     const expandChurnPopup = (container, title, data) => {
@@ -1101,21 +1127,29 @@ Date & Time Stamp of Generated Report: ${timestamp}
         const isSkuVisible = skuToggle && skuToggle.checked;
         const skuClass = isSkuVisible ? 'sku-column' : 'sku-column hidden';
 
+        const isStateVisible = stateToggle && stateToggle.checked;
+        const stateClass = isStateVisible ? 'state-column' : 'state-column hidden';
+
+        const isStoreTypeVisible = storeTypeToggle && storeTypeToggle.checked;
+        const storeTypeClass = isStoreTypeVisible ? 'store-type-column' : 'store-type-column hidden';
+
         const fragment = document.createDocumentFragment();
         data.forEach((row, index) => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${index + 1}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800">${row['First Name']}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800">${row['Last Name']}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${row['Phone Number']}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 hidden md:table-cell">${row['Referral Code'] || 'N/A'}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500">${row['LGA'] || 'N/A'}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500" title="${row['Store Name'] || ''}">${truncateText(row['Store Name'])}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500" title="${row['Store Address'] || ''}">${truncateText(row['Store Address'])}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 font-medium">${row['Transaction Count']}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 font-medium ${skuClass}">${row['SKU Count']}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 font-medium">${new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(row['Total Amount'])}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">${index + 1}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-slate-200">${row['First Name']}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-slate-200">${row['Last Name']}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">${row['Phone Number']}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 hidden md:table-cell">${row['Referral Code'] || 'N/A'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">${row['LGA'] || 'N/A'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 ${stateClass}">${row['State'] || 'N/A'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400" title="${row['Store Name'] || ''}">${truncateText(row['Store Name'])}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 ${storeTypeClass}">${row['Store Type'] || 'N/A'}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400" title="${row['Store Address'] || ''}">${truncateText(row['Store Address'])}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-slate-200 font-medium">${row['Transaction Count']}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-slate-200 font-medium ${skuClass}">${row['SKU Count']}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-slate-200 font-medium">${new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(row['Total Amount'])}</td>
             `;
             fragment.appendChild(tr);
         });
@@ -1128,7 +1162,8 @@ Date & Time Stamp of Generated Report: ${timestamp}
         // NEW: Create Grand Total Row
         if (data.length > 0) {
             const totalRow = document.createElement('tr');
-            totalRow.className = 'bg-slate-50 font-bold border-t-2 border-slate-300';
+            totalRow.className = 'bg-slate-50 dark:bg-slate-700 font-bold border-t-2 border-slate-300 dark:border-slate-500';
+            // FIXED: Ensure exactly 13 columns match the header structure.
             totalRow.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
@@ -1136,11 +1171,13 @@ Date & Time Stamp of Generated Report: ${timestamp}
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 hidden md:table-cell"></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 ${stateClass}"></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
-                <td class="px-6 py-4 whitespace-nowrap text-right text-sm text-slate-800">Grand Total:</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800">${new Intl.NumberFormat('en-US').format(totalTxn)}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 ${skuClass}">${new Intl.NumberFormat('en-US').format(totalSku)}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800">${new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(totalAmt)}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 ${storeTypeClass}"></td>
+                <td class="px-6 py-4 whitespace-nowrap text-right text-sm font-bold text-slate-800 dark:text-white">Grand Total:</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-white font-bold">${new Intl.NumberFormat('en-US').format(totalTxn)}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-white font-bold ${skuClass}">${new Intl.NumberFormat('en-US').format(totalSku)}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-white font-bold">${new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN' }).format(totalAmt)}</td>
             `;
             fragment.appendChild(totalRow);
         }
@@ -1490,6 +1527,34 @@ Date & Time Stamp of Generated Report: ${timestamp}
         });
     }
 
+    // State Toggle Logic
+    if (stateToggle) {
+        stateToggle.addEventListener('change', () => {
+            const cells = document.querySelectorAll('.state-column');
+            cells.forEach(cell => {
+                if (stateToggle.checked) {
+                    cell.classList.remove('hidden');
+                } else {
+                    cell.classList.add('hidden');
+                }
+            });
+        });
+    }
+
+    // Store Type Toggle Logic
+    if (storeTypeToggle) {
+        storeTypeToggle.addEventListener('change', () => {
+            const cells = document.querySelectorAll('.store-type-column');
+            cells.forEach(cell => {
+                if (storeTypeToggle.checked) {
+                    cell.classList.remove('hidden');
+                } else {
+                    cell.classList.add('hidden');
+                }
+            });
+        });
+    }
+
     cohortToggle.addEventListener('change', () => {
         const isChecked = cohortToggle.checked;
         cohortInputs.classList.toggle('hidden', !isChecked);
@@ -1517,26 +1582,38 @@ Date & Time Stamp of Generated Report: ${timestamp}
         const min = parseInt(minTransInput.value, 10);
         const max = parseInt(maxTransInput.value, 10);
         const searchTerm = searchInput.value.toLowerCase().trim();
+        const searchCol = searchColumnSelect.value; // NEW: Get dropdown value
 
         filteredData = dataPeriod2.filter(row => {
+            // 1. Transaction Count Filter
             const count = row['Transaction Count'];
             const minMatch = isNaN(min) || count >= min;
             const maxMatch = isNaN(max) || count <= max;
-
             if (!minMatch || !maxMatch) return false;
 
+            // 2. Search Filter
             if (searchTerm) {
-                const fullName = `${row['First Name'] || ''} ${row['Last Name'] || ''}`.toLowerCase();
-                const phone = (row['Phone Number'] || '').toLowerCase();
-                const lga = (row['LGA'] || '').toLowerCase();
-                const store = (row['Store Name'] || '').toLowerCase();
-                const referral = (row['Referral Code'] || '').toLowerCase();
-
-                return fullName.includes(searchTerm) ||
-                       phone.includes(searchTerm) ||
-                       lga.includes(searchTerm) ||
-                       store.includes(searchTerm) ||
-                       referral.includes(searchTerm);
+                if (searchCol === 'all') {
+                    // Search ALL visible columns (including new ones)
+                    // We construct a comprehensive string of all searchable fields
+                    const searchableValues = [
+                        row['First Name'], 
+                        row['Last Name'], 
+                        row['Phone Number'], 
+                        row['Referral Code'], 
+                        row['LGA'],
+                        row['State'], 
+                        row['Store Name'], 
+                        row['Store Type'], 
+                        row['Store Address']
+                    ].map(val => (val || '').toString().toLowerCase());
+                    
+                    return searchableValues.some(val => val.includes(searchTerm));
+                } else {
+                    // Strict Column Search
+                    const cellValue = (row[searchCol] || '').toString().toLowerCase();
+                    return cellValue.includes(searchTerm);
+                }
             }
 
             return true;
@@ -1546,11 +1623,26 @@ Date & Time Stamp of Generated Report: ${timestamp}
     minTransInput.addEventListener('input', applyFilters);
     maxTransInput.addEventListener('input', applyFilters);
     searchInput.addEventListener('input', applyFilters);
+    searchColumnSelect.addEventListener('change', applyFilters); // NEW: Trigger search on dropdown change
 
     exportBtn.addEventListener('click', () => {
         if (filteredData.length === 0) { alert('No data to export.'); return; }
+        // Updated Export Columns
+        const columnsToExport = ['First Name', 'Last Name', 'Phone Number', 'Referral Code', 'LGA', 'Store Name', 'Store Address', 'Transaction Count', 'SKU Count', 'Total Amount'];
+        
+        // Add new columns if data exists for them (simplistic check, or just add them always)
+        // Let's add them conditionally or just add them.
+        // User asked to surface them in table, so exporting them makes sense.
+        // Since we are unparsing filteredData, let's just use all fields or insert them correctly.
+        // To be safe and keep order:
+        const exportColumns = [
+            'First Name', 'Last Name', 'Phone Number', 'Referral Code', 
+            'LGA', 'State', 'Store Name', 'Store Type', 'Store Address', 
+            'Transaction Count', 'SKU Count', 'Total Amount'
+        ];
+
         const csv = Papa.unparse(filteredData, {
-            columns: ['First Name', 'Last Name', 'Phone Number', 'Referral Code', 'LGA', 'Store Name', 'Store Address', 'Transaction Count', 'SKU Count', 'Total Amount']
+            columns: exportColumns
         });
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const link = document.createElement('a');
