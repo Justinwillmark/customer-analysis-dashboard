@@ -38,12 +38,12 @@ document.addEventListener('DOMContentLoaded', () => {
     loginForm.addEventListener('submit', handleLogin);
     checkLogin();
 
-    // --- DARK MODE LOGIC ---
+    // --- DARK MODE LOGIC (Updated: Defaults to Light) ---
     const themeToggle = document.getElementById('theme-toggle');
     const htmlElement = document.documentElement;
 
-    // Check saved preference or system preference
-    if (localStorage.theme === 'dark' || (!('theme' in localStorage) && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+    // Only enable dark mode if explicitly stored in local storage
+    if (localStorage.theme === 'dark') {
         htmlElement.classList.add('dark');
     } else {
         htmlElement.classList.remove('dark');
@@ -1668,7 +1668,14 @@ Date & Time Stamp of Generated Report: ${timestamp}
             btn.className = 'date-preset-btn';
             btn.textContent = preset.label;
             btn.type = 'button';
-            btn.addEventListener('click', () => {
+            btn.addEventListener('click', (e) => {
+                // Remove active class from siblings
+                const siblings = targetConfig.container.querySelectorAll('.date-preset-btn');
+                siblings.forEach(s => s.classList.remove('active'));
+                
+                // Add active class to clicked button
+                btn.classList.add('active');
+                
                 let start, end;
                 if (preset.type === 'month') {
                     start = new Date(today.getFullYear(), today.getMonth(), 1);
