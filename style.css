@@ -78,7 +78,7 @@ html.dark .bg-line-shape {
     overflow: hidden;
 }
 
-.shooting-star {
+/* .shooting-star {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -86,10 +86,10 @@ html.dark .bg-line-shape {
     background: linear-gradient(-45deg, #5f91ff, rgba(0, 0, 255, 0));
     filter: drop-shadow(0 0 6px #699bff);
     animation: tail 3000ms ease-in-out infinite, shooting 3000ms ease-in-out infinite;
-}
+} */
 
 /* The head of the star */
-.shooting-star::before, .shooting-star::after {
+/* .shooting-star::before, .shooting-star::after {
     content: '';
     position: absolute;
     top: calc(50% - 1px);
@@ -99,7 +99,7 @@ html.dark .bg-line-shape {
     transform: translateX(50%) rotateZ(45deg);
     border-radius: 100%;
     animation: shining 3000ms ease-in-out infinite;
-}
+} */
 
 .shooting-star::after {
     transform: translateX(50%) rotateZ(-45deg);
