@@ -123,6 +123,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const skuToggle = document.getElementById('sku-toggle');
     const stateToggle = document.getElementById('state-toggle');
     const storeTypeToggle = document.getElementById('store-type-toggle');
+    const lastNameToggle = document.getElementById('last-name-toggle');
 
     // --- HELPER FUNCTIONS ---
     const showStatus = (message, showLoader = true) => {
@@ -501,7 +502,7 @@ document.addEventListener('DOMContentLoaded', () => {
         createPopupTable('churned-popup', 'Churned Users', churnedData);
         createPopupTable('total-popup', 'Total Active Users', dataPeriod2);
 
-        tableTitle.textContent = `User Data for ${period2Text}`;
+        tableTitle.textContent = `Active Users: ${period2Text}`;
         tableDescription.textContent = `Showing ${dataPeriod2.length} total users in this period.`;
 
         // 90-DAY CHART RENDERING
@@ -1133,13 +1134,16 @@ Date & Time Stamp of Generated Report: ${timestamp}
         const isStoreTypeVisible = storeTypeToggle && storeTypeToggle.checked;
         const storeTypeClass = isStoreTypeVisible ? 'store-type-column' : 'store-type-column hidden';
 
+        const isLastNameVisible = lastNameToggle && lastNameToggle.checked;
+        const lastNameClass = isLastNameVisible ? 'last-name-column' : 'last-name-column hidden';
+
         const fragment = document.createDocumentFragment();
         data.forEach((row, index) => {
             const tr = document.createElement('tr');
             tr.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">${index + 1}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-slate-200">${row['First Name']}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-slate-200">${row['Last Name']}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-slate-200 ${lastNameClass}">${row['Last Name']}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">${row['Phone Number']}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 hidden md:table-cell">${row['Referral Code'] || 'N/A'}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">${row['LGA'] || 'N/A'}</td>
@@ -1167,7 +1171,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
             totalRow.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 ${lastNameClass}"></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 hidden md:table-cell"></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
@@ -1555,6 +1559,20 @@ Date & Time Stamp of Generated Report: ${timestamp}
         });
     }
 
+    // Last Name Toggle Logic
+    if (lastNameToggle) {
+        lastNameToggle.addEventListener('change', () => {
+            const cells = document.querySelectorAll('.last-name-column');
+            cells.forEach(cell => {
+                if (lastNameToggle.checked) {
+                    cell.classList.remove('hidden');
+                } else {
+                    cell.classList.add('hidden');
+                }
+            });
+        });
+    }
+
     cohortToggle.addEventListener('change', () => {
         const isChecked = cohortToggle.checked;
         cohortInputs.classList.toggle('hidden', !isChecked);
@@ -1618,6 +1636,20 @@ Date & Time Stamp of Generated Report: ${timestamp}
 
             return true;
         });
+
+        // --- NEW: Update Header Count ---
+        if (dataPeriod2.length > 0) {
+            const count = filteredData.length;
+            const total = dataPeriod2.length;
+            
+            // Check if active search or filters are present
+            if (searchTerm || !isNaN(min) || !isNaN(max)) {
+                 tableDescription.innerHTML = `Found <span class="font-bold text-slate-900 dark:text-white">${count}</span> matching results (out of ${total}).`;
+            } else {
+                 tableDescription.textContent = `Showing all ${total} users in this period.`;
+            }
+        }
+        
         renderTable(filteredData);
     };
     minTransInput.addEventListener('input', applyFilters);

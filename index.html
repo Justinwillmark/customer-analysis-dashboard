@@ -126,7 +126,7 @@
         </details>
 
         <details class="api-details bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-8 shadow-sm" open>
-            <summary class="api-summary dark:text-slate-200 dark:hover:bg-slate-700">Alternative: Fetch from API Endpoint</summary>
+            <summary class="api-summary dark:text-slate-200 dark:hover:bg-slate-700">Fetch from API Endpoint</summary>
             <div class="p-6">
                 <div class="grid grid-cols-1 gap-6">
                     <div>
@@ -277,7 +277,7 @@
                                 </div>
                             </div>
 
-                            <div class="relative z-10">
+                            <div class="relative z-50">
                                 <details class="column-dropdown group">
                                     <summary class="h-10 flex items-center gap-2 cursor-pointer bg-white dark:bg-slate-700 border border-slate-300 dark:border-slate-600 rounded-md px-4 text-sm font-medium text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-600 transition select-none shadow-sm whitespace-nowrap">
                                         <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 text-slate-500 dark:text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -290,6 +290,10 @@
                                     </summary>
                                     <div class="absolute right-0 mt-2 w-56 bg-white dark:bg-slate-800 rounded-md shadow-lg border border-slate-200 dark:border-slate-600 p-2 z-20">
                                         <div class="px-2 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">Visible Columns</div>
+                                        <label class="flex items-center gap-2 px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded cursor-pointer">
+                                            <input type="checkbox" id="last-name-toggle" class="w-4 h-4 text-blue-600 border-gray-300 dark:border-slate-500 rounded focus:ring-blue-500 dark:bg-slate-700">
+                                            <span class="text-sm text-slate-700 dark:text-slate-300">Last Name</span>
+                                        </label>
                                         <label class="flex items-center gap-2 px-2 py-2 hover:bg-slate-50 dark:hover:bg-slate-700 rounded cursor-pointer">
                                             <input type="checkbox" id="sku-toggle" class="w-4 h-4 text-blue-600 border-gray-300 dark:border-slate-500 rounded focus:ring-blue-500 dark:bg-slate-700">
                                             <span class="text-sm text-slate-700 dark:text-slate-300">SKU Count</span>
@@ -319,13 +323,13 @@
                 </div>
 
                 <div class="relative">
-                    <div id="table-scroll-container" class="overflow-x-auto rounded-lg border border-slate-200 dark:border-slate-700">
+                    <div id="table-scroll-container" class="overflow-x-auto overflow-y-auto max-h-[700px] rounded-lg border border-slate-200 dark:border-slate-700 relative">
                         <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
-                            <thead class="bg-slate-50 dark:bg-slate-700/50">
+                            <thead class="bg-slate-50 dark:bg-slate-700 sticky top-0 z-10 shadow-sm">
                                 <tr>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">#</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">First Name</th>
-                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Last Name</th>
+                                    <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider last-name-column hidden">Last Name</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">Phone Number</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider hidden md:table-cell">Referral Code</th>
                                     <th class="px-6 py-3 text-left text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">LGA</th>
