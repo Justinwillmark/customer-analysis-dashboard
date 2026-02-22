@@ -80,7 +80,18 @@ document.addEventListener('DOMContentLoaded', async () => {
             Papa.parse(text, {
                 header: true,
                 skipEmptyLines: true,
-                complete: (results) => resolve(results.data),
+                complete: (results) => {
+                    const validRows = results.data.filter(row => {
+                         const phone = row['Phone Number'];
+                         const name = row['First Name'];
+                         
+                         if (!phone || typeof phone !== 'string' || phone.trim() === '') return false;
+                         if (name && /^(grand )?total$/i.test(name.trim())) return false;
+                         
+                         return true;
+                    });
+                    resolve(validRows);
+                },
                 error: reject
             });
         });
@@ -451,6 +462,11 @@ document.addEventListener('DOMContentLoaded', async () => {
         // Helper to check against search term
         const matchesSearch = (user) => {
             const ae = (user.assignedAE || user['Referral Code'] || '').toLowerCase();
+
+            if (searchTerm === '*' && (!ae || ae === 'unassigned')) {
+                return true;
+            }
+
             return ae.includes(searchTerm);
         };
 
@@ -623,7 +639,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             // Construct URLs
             const urlOnboarding = `${retentionEndpoint}?download=retained-user-stats&startDate=${toYYYYMMDD(dateBufferStart)}&endDate=${toYYYYMMDD(currentEndDate)}`;
             const urlActivity = `${retentionEndpoint}?download=retained-user-stats&startDate=${toYYYYMMDD(dateStrictStart)}&endDate=${toYYYYMMDD(currentEndDate)}`;
-            const urlHistorical = `${retentionEndpoint}?download=retained-user-stats&startDate=${toYYYYMMDD(dateHistoricalStart)}&endDate=${toYYYYMMDD(dateHistoricalEnd)}`;
+            const urlHistorical = `${retentionEndpoint}?download=retained-user-stats&startDate=${toYYYYMMDD(dateHistoricalStart)}&endDate=${toYYYYMMDD(dateHistoricalEnd)}`; // FIX: Reverted typo here
             
             // Fetch All
             const [resOnboarding, resActivity, resHistorical] = await Promise.all([

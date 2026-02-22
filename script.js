@@ -73,6 +73,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // --- DOM ELEMENTS ---
     const apiUrlInput = document.getElementById('api-url');
+    const editApiUrlToggle = document.getElementById('edit-api-url-toggle');
+    const apiUrlContainer = document.getElementById('api-url-container');
     const fetchApiBtn = document.getElementById('fetch-api-data');
     const cohortToggle = document.getElementById('cohort-toggle');
     const cohortInputs = document.getElementById('cohort-inputs');
@@ -116,6 +118,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const lastNameToggle = document.getElementById('last-name-toggle');
 
     // --- HELPER FUNCTIONS ---
+    
+    // Toggle URL Editor Visibility
+    if (editApiUrlToggle && apiUrlContainer) {
+        editApiUrlToggle.addEventListener('change', () => {
+            if (editApiUrlToggle.checked) {
+                apiUrlContainer.classList.remove('hidden');
+            } else {
+                apiUrlContainer.classList.add('hidden');
+            }
+        });
+    }
+
     const showStatus = (message, showLoader = true) => {
         statusContainer.classList.remove('hidden');
         statusMessage.textContent = message;
@@ -207,6 +221,10 @@ document.addEventListener('DOMContentLoaded', () => {
         period2Label = null;
         reportData = {};
         reportInfoIcon.classList.add('hidden');
+        
+        const legendEl = document.getElementById('user-table-legend');
+        if (legendEl) legendEl.classList.add('hidden');
+        
         hideReportModal();
 
         destroyCharts();
@@ -365,6 +383,11 @@ document.addEventListener('DOMContentLoaded', () => {
 
             hideStatus();
             dashboard.classList.remove('hidden');
+            
+            // Auto collapse Fetch API Endpoint
+            const apiDetails = document.querySelector('.api-details');
+            if (apiDetails) apiDetails.open = false;
+
             dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
         } catch (error) {
@@ -385,8 +408,16 @@ document.addEventListener('DOMContentLoaded', () => {
         const newUsersSet = new Set([...usersP2PhoneNumbers].filter(phone => !usersP1PhoneNumbers.has(phone)));
         const churnedPhoneNumbers = new Set([...usersP1PhoneNumbers].filter(phone => !usersP2PhoneNumbers.has(phone)));
         
-        const retainedData = dataPeriod2.filter(u => retainedUsersSet.has(u['Phone Number']));
-        const newData = dataPeriod2.filter(u => newUsersSet.has(u['Phone Number']));
+        // Let's modify dataPeriod2 directly to inject the status
+        dataPeriod2 = dataPeriod2.map(u => {
+            let status = 'Unknown';
+            if (retainedUsersSet.has(u['Phone Number'])) status = 'Retained';
+            else if (newUsersSet.has(u['Phone Number'])) status = 'New';
+            return { ...u, status };
+        });
+
+        const retainedData = dataPeriod2.filter(u => u.status === 'Retained');
+        const newData = dataPeriod2.filter(u => u.status === 'New');
         
         const churnDetailsMap = new Map(churnUserDetails.map(u => [u['Phone Number'], u]));
         
@@ -468,6 +499,9 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         };
         reportInfoIcon.classList.remove('hidden');
+        
+        const legendEl = document.getElementById('user-table-legend');
+        if (legendEl) legendEl.classList.remove('hidden');
 
         applyFilters();
     };
@@ -1021,9 +1055,28 @@ ${analysisUrl}`;
         const fragment = document.createDocumentFragment();
         data.forEach((row, index) => {
             const tr = document.createElement('tr');
+            
+            let rowClass = 'transition-colors';
+            let badgeHtml = '';
+            
+            if (row.status === 'Retained') {
+                rowClass += ' bg-emerald-50/80 dark:bg-emerald-900/20 hover:bg-emerald-100/80 dark:hover:bg-emerald-900/40';
+                badgeHtml = `<span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-emerald-100 text-emerald-700 dark:bg-emerald-800/80 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-700/80">Retained</span>`;
+            } else if (row.status === 'New') {
+                rowClass += ' bg-sky-50/80 dark:bg-sky-900/20 hover:bg-sky-100/80 dark:hover:bg-sky-900/40';
+                badgeHtml = `<span class="ml-2 inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-semibold bg-sky-100 text-sky-700 dark:bg-sky-800/80 dark:text-sky-300 border border-sky-200 dark:border-sky-700/80">New</span>`;
+            }
+
+            tr.className = rowClass;
+
             tr.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">${index + 1}</td>
-                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-slate-200">${row['First Name']}</td>
+                <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-slate-200">
+                    <div class="flex items-center">
+                        <span class="font-medium">${row['First Name']}</span>
+                        ${badgeHtml}
+                    </div>
+                </td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-800 dark:text-slate-200 ${lastNameClass}">${row['Last Name']}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400">${row['Phone Number']}</td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500 dark:text-slate-400 hidden md:table-cell">${row['Referral Code'] || 'N/A'}</td>
@@ -1945,6 +1998,10 @@ ${analysisUrl}`;
                     ${buildCard("Previous Week", prevWk, false)}
                 </div>
             `;
+            
+            // Auto open the details view
+            const monitorDetails = document.querySelector('.weekly-monitor-details');
+            if (monitorDetails) monitorDetails.open = true;
 
         } catch (err) {
             console.error("Weekly Monitor Background Process Error:", err);

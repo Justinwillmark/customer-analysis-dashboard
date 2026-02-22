@@ -96,7 +96,7 @@
         </header>
 
         <details class="weekly-monitor-details bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-8 shadow-sm">
-            <summary class="weekly-monitor-summary dark:text-slate-200 dark:hover:bg-slate-700">Live Weekly Monitor Stats</summary>
+            <summary class="weekly-monitor-summary dark:text-slate-200 dark:hover:bg-slate-700">Real-time Weekly Stats + Fieldwork</summary>
             <div id="weekly-monitor-content">
                 <div class="p-10 text-center text-slate-500 flex flex-col items-center">
                     <div class="loader mb-4 w-8 h-8 border-4"></div>
@@ -106,22 +106,35 @@
         </details>
 
         <details class="api-details bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-8 shadow-sm" open>
-            <summary class="api-summary dark:text-slate-200 dark:hover:bg-slate-700">Fetch from API Endpoint</summary>
+            <summary class="api-summary dark:text-slate-200 dark:hover:bg-slate-700">Run Analysis</summary>
             <div class="p-6">
-                <div class="grid grid-cols-1 gap-6">
-                    <div>
-                        <label for="api-url" class="block text-sm font-medium text-slate-700 dark:text-slate-300">Base API URL</label>
-                        <input type="text" id="api-url" class="mt-1 block w-full border-slate-300 dark:border-slate-600 dark:bg-slate-700 dark:text-white rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 text-sm p-2" value="https://pika-inventory-94729b833f18.herokuapp.com/api/v1/admin/analytics/retention">
+                
+                <div class="flex flex-col md:flex-row md:items-start justify-between gap-4">
+                    <div class="flex flex-col flex-grow gap-3 w-full max-w-2xl">
+                        <div class="flex items-center gap-3">
+                            <span class="text-sm font-semibold text-slate-700 dark:text-slate-200">API Endpoint Configuration</span>
+                            <label class="flex items-center gap-1.5 cursor-pointer bg-white dark:bg-slate-700 hover:bg-slate-50 dark:hover:bg-slate-600 px-2 py-1 rounded border border-slate-200 dark:border-slate-600 shadow-sm transition-colors">
+                                <input type="checkbox" id="edit-api-url-toggle" class="rounded border-slate-300 text-blue-600 focus:ring-blue-500 w-3.5 h-3.5 cursor-pointer">
+                                <span class="text-xs font-medium text-slate-600 dark:text-slate-300 select-none">Edit Base URL</span>
+                            </label>
+                        </div>
+                        <div id="api-url-container" class="hidden transition-all duration-300">
+                            <input type="text" id="api-url" class="block w-full border border-slate-300 dark:border-slate-600 dark:bg-slate-800 dark:text-white rounded-md shadow-inner focus:ring-blue-500 focus:border-blue-500 text-sm p-2.5 transition-colors" value="https://pika-inventory-94729b833f18.herokuapp.com/api/v1/admin/analytics/retention">
+                        </div>
                     </div>
 
-                    <div class="flex items-center justify-end gap-3">
-                         <label for="cohort-toggle" class="text-sm font-medium text-slate-700 dark:text-slate-300">Use Cohort Comparison</label>
-                         <label class="toggle-switch">
+                    <div class="flex items-center justify-between md:justify-start gap-3 bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600 px-4 py-2.5 rounded-lg shadow-sm flex-shrink-0">
+                         <label for="cohort-toggle" class="text-sm font-semibold text-slate-700 dark:text-slate-200 cursor-pointer select-none">Use Cohort Comparison</label>
+                         <label class="toggle-switch transform scale-90" style="margin: 0;">
                             <input type="checkbox" id="cohort-toggle">
                             <span class="slider"></span>
                         </label>
                     </div>
+                </div>
 
+                <hr class="my-6 border-slate-100 dark:border-slate-700/80">
+
+                <div class="grid grid-cols-1 gap-6">
                     <div id="cohort-inputs" class="hidden">
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-6">
                             <div>
@@ -208,9 +221,19 @@
 
             <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
                 <div class="mb-6">
-                    <div class="mb-4">
-                        <h3 id="table-title" class="text-2xl font-bold text-slate-800 dark:text-white">User Data</h3>
-                        <p id="table-description" class="text-sm text-slate-500 dark:text-slate-400 mt-1">Select a period to see user data.</p>
+                    <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                        <div>
+                            <h3 id="table-title" class="text-2xl font-bold text-slate-800 dark:text-white">User Data</h3>
+                            <p id="table-description" class="text-sm text-slate-500 dark:text-slate-400 mt-1">Select a period to see user data.</p>
+                        </div>
+                        <div id="user-table-legend" class="hidden flex flex-wrap items-center gap-3 text-xs font-medium">
+                            <div class="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800/50 rounded-md">
+                                <span class="w-2 h-2 rounded-full bg-emerald-500"></span> Retained Users
+                            </div>
+                            <div class="flex items-center gap-1.5 px-2.5 py-1 bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800/50 rounded-md">
+                                <span class="w-2 h-2 rounded-full bg-sky-500"></span> New Users
+                            </div>
+                        </div>
                     </div>
 
                     <div class="flex flex-col lg:flex-row gap-4 items-end lg:items-center justify-between">
