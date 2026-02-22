@@ -83,7 +83,7 @@
         <header class="mb-8 flex flex-col md:flex-row items-center justify-between gap-4">
             <div class="text-center md:text-left">
                 <h1 class="text-3xl sm:text-4xl font-bold text-slate-900 dark:text-white main-title">Retention & Analysis Dashboard</h1>
-                <p class="text-slate-500 dark:text-slate-400 mt-2">Use the API fetch for cohort and churn analysis or upload files for comparison.</p>
+                <p class="text-slate-500 dark:text-slate-400 mt-2">Use the API fetch for cohort and churn analysis or view live metrics.</p>
             </div>
             <button id="theme-toggle" class="p-2 rounded-full bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm text-slate-500 dark:text-slate-400 hover:text-blue-600 dark:hover:text-blue-400 transition-colors">
                 <svg id="sun-icon" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 hidden dark:block" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -95,32 +95,12 @@
             </button>
         </header>
 
-        <details class="file-upload-details bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-8 shadow-sm">
-            <summary class="file-upload-summary dark:text-slate-200 dark:hover:bg-slate-700">Upload CSV Files for Comparison</summary>
-            <div class="p-6">
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <div id="upload-container-1" class="file-input-container rounded-lg p-6 text-center dark:border-slate-600">
-                        <input type="file" id="csv-file-1" class="hidden" accept=".csv">
-                        <label for="csv-file-1" class="cursor-pointer">
-                            <div class="flex flex-col items-center justify-center space-y-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                                <p class="font-semibold text-slate-700 dark:text-slate-300">Upload Period 1 File</p>
-                                <p id="file-name-1" class="text-sm text-slate-500 dark:text-slate-400">Drag & drop or click to upload</p>
-                                <p id="date-range-1" class="text-sm font-semibold text-blue-600 dark:text-blue-400"></p>
-                            </div>
-                        </label>
-                    </div>
-                    <div id="upload-container-2" class="file-input-container rounded-lg p-6 text-center disabled dark:bg-slate-800 dark:border-slate-700">
-                        <input type="file" id="csv-file-2" class="hidden" accept=".csv" disabled>
-                        <label for="csv-file-2" id="upload-label-2" class="cursor-not-allowed">
-                            <div class="flex flex-col items-center justify-center space-y-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
-                                <p class="font-semibold text-slate-700 dark:text-slate-300">Upload Period 2 File</p>
-                                <p id="file-name-2" class="text-sm text-slate-500 dark:text-slate-400">Upload Period 1 file first</p>
-                                <p id="date-range-2" class="text-sm font-semibold text-green-600 dark:text-green-400"></p>
-                            </div>
-                        </label>
-                    </div>
+        <details class="weekly-monitor-details bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-8 shadow-sm">
+            <summary class="weekly-monitor-summary dark:text-slate-200 dark:hover:bg-slate-700">Live Weekly Monitor Stats</summary>
+            <div id="weekly-monitor-content">
+                <div class="p-10 text-center text-slate-500 flex flex-col items-center">
+                    <div class="loader mb-4 w-8 h-8 border-4"></div>
+                    <p class="font-medium animate-pulse">Generating real-time weekly insights...</p>
                 </div>
             </div>
         </details>
@@ -365,7 +345,6 @@
              <button id="close-report-btn" class="bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-white font-semibold py-2 px-4 rounded-md hover:bg-slate-300 dark:hover:bg-slate-600 transition">Close</button>
         </div>
     </div>
-
 
     <script src="script.js"></script>
 </body>

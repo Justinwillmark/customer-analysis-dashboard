@@ -78,29 +78,6 @@ html.dark .bg-line-shape {
     overflow: hidden;
 }
 
-/* .shooting-star {
-    position: absolute;
-    top: 50%;
-    left: 50%;
-    height: 2px;
-    background: linear-gradient(-45deg, #5f91ff, rgba(0, 0, 255, 0));
-    filter: drop-shadow(0 0 6px #699bff);
-    animation: tail 3000ms ease-in-out infinite, shooting 3000ms ease-in-out infinite;
-} */
-
-/* The head of the star */
-/* .shooting-star::before, .shooting-star::after {
-    content: '';
-    position: absolute;
-    top: calc(50% - 1px);
-    right: 0;
-    height: 2px;
-    background: linear-gradient(-45deg, rgba(0, 0, 255, 0), #5f91ff, rgba(0, 0, 255, 0));
-    transform: translateX(50%) rotateZ(45deg);
-    border-radius: 100%;
-    animation: shining 3000ms ease-in-out infinite;
-} */
-
 .shooting-star::after {
     transform: translateX(50%) rotateZ(-45deg);
 }
@@ -166,72 +143,20 @@ html.dark .metric-card:hover {
     background-color: #1e293b; /* slate-800 lighter */
 }
 
-/* Custom file input styling */
-.file-input-container {
-    border: 2px dashed #cbd5e1; /* slate-300 */
-    transition: border-color 0.2s, background-color 0.2s;
-}
-html.dark .file-input-container {
-    border-color: #475569; /* slate-600 */
-    background-color: #0f172a; /* slate-900 */
-}
-.file-input-container.dragover {
-    border-color: #2563eb; /* blue-600 */
-    background-color: #eff6ff; /* blue-50 */
-}
-html.dark .file-input-container.dragover {
-    background-color: #1e293b; /* slate-800 */
-}
-.file-input-container.disabled {
-    background-color: #f1f5f9; /* slate-100 */
-    cursor: not-allowed;
-    opacity: 0.6;
-}
 
-/* Styles for the collapsible file upload section */
-.file-upload-details > summary {
-    list-style: none;
-    padding: 1rem 1.5rem;
-    font-weight: 600;
-    color: #334155; /* slate-700 */
-    cursor: pointer;
-    transition: background-color 0.2s;
-}
-html.dark .file-upload-details > summary {
-    color: #e2e8f0; /* slate-200 */
-}
-.file-upload-details > summary::-webkit-details-marker {
-    display: none;
-}
-.file-upload-details > summary::before {
-    content: '▶';
-    display: inline-block;
-    margin-right: 0.75rem;
-    font-size: 0.8em;
-    transform: rotate(0deg);
-    transition: transform 0.2s;
-}
-.file-upload-details[open] > summary {
-    background-color: #f1f5f9; /* slate-100 */
-}
-html.dark .file-upload-details[open] > summary {
-    background-color: #1e293b; /* slate-800 */
-}
-.file-upload-details[open] > summary::before {
-    transform: rotate(90deg);
-}
-
-
-/* API Details/Summary Styles - MODERNIZED */
+/* --- Details/Summary Styles for both Monitor & API blocks - MODERNIZED --- */
+.weekly-monitor-details,
 .api-details {
     overflow: hidden; /* Ensure rounded corners clip content */
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Stronger default shadow */
     transition: box-shadow 0.3s ease;
 }
+.weekly-monitor-details:hover,
 .api-details:hover {
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* Lift effect */
 }
 
+.weekly-monitor-details > summary,
 .api-details > summary {
     list-style: none; /* Remove default marker */
     padding: 1rem 1.5rem;
@@ -240,11 +165,15 @@ html.dark .file-upload-details[open] > summary {
     cursor: pointer;
     transition: background-color 0.2s;
 }
+html.dark .weekly-monitor-details > summary,
 html.dark .api-details > summary { color: #e2e8f0; }
 
+.weekly-monitor-details > summary::-webkit-details-marker,
 .api-details > summary::-webkit-details-marker {
     display: none; /* Hide for Chrome/Safari */
 }
+
+.weekly-monitor-details > summary::before,
 .api-details > summary::before {
     content: '▶'; /* Collapsed state */
     display: inline-block;
@@ -253,17 +182,23 @@ html.dark .api-details > summary { color: #e2e8f0; }
     transform: rotate(0deg);
     transition: transform 0.2s;
 }
+
+.weekly-monitor-details[open] > summary::before,
 .api-details[open] > summary::before {
     transform: rotate(90deg); /* Expanded state */
 }
+
+.weekly-monitor-details[open] > summary,
 .api-details[open] > summary {
     background-color: #f8fafc; /* slate-50 - subtle background */
     border-bottom: 1px solid #e2e8f0;
 }
+html.dark .weekly-monitor-details[open] > summary,
 html.dark .api-details[open] > summary { 
     background-color: #1e293b; 
     border-bottom: 1px solid #334155;
 }
+
 
 /* API Preset Date Buttons - STYLED */
 .date-preset-btn {

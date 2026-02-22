@@ -38,11 +38,10 @@ document.addEventListener('DOMContentLoaded', () => {
     loginForm.addEventListener('submit', handleLogin);
     checkLogin();
 
-    // --- DARK MODE LOGIC (Updated: Defaults to Light) ---
+    // --- DARK MODE LOGIC ---
     const themeToggle = document.getElementById('theme-toggle');
     const htmlElement = document.documentElement;
 
-    // Only enable dark mode if explicitly stored in local storage
     if (localStorage.theme === 'dark') {
         htmlElement.classList.add('dark');
     } else {
@@ -73,15 +72,6 @@ document.addEventListener('DOMContentLoaded', () => {
     const accountExecutives = ['Chimezie Ezimoha', 'Waheed Ayinla', 'Abraham Ohworieha', 'Semilogo (for phone call)'];
 
     // --- DOM ELEMENTS ---
-    const uploadContainer1 = document.getElementById('upload-container-1');
-    const uploadContainer2 = document.getElementById('upload-container-2');
-    const fileInput1 = document.getElementById('csv-file-1');
-    const fileInput2 = document.getElementById('csv-file-2');
-    const fileName1 = document.getElementById('file-name-1');
-    const fileName2 = document.getElementById('file-name-2');
-    const dateRangeEl1 = document.getElementById('date-range-1');
-    const dateRangeEl2 = document.getElementById('date-range-2');
-    const uploadLabel2 = document.getElementById('upload-label-2');
     const apiUrlInput = document.getElementById('api-url');
     const fetchApiBtn = document.getElementById('fetch-api-data');
     const cohortToggle = document.getElementById('cohort-toggle');
@@ -170,6 +160,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
+    // RESTORED ORIGINAL: Uses UTC behavior to match original dashboard logic exactly
     const toYYYYMMDD = (d) => d.toISOString().split('T')[0];
 
     const truncateText = (text, wordLimit = 3) => {
@@ -243,18 +234,6 @@ document.addEventListener('DOMContentLoaded', () => {
         tableTitle.textContent = 'User Data';
         tableDescription.textContent = 'Select a period to see user data.';
 
-        fileInput1.value = '';
-        fileInput2.value = '';
-        fileName1.textContent = 'Drag & drop or click to upload';
-        fileName2.textContent = 'Upload Period 1 file first';
-        dateRangeEl1.textContent = '';
-        dateRangeEl2.textContent = '';
-        if (!uploadContainer2.classList.contains('disabled')) {
-             uploadContainer2.classList.add('disabled');
-             uploadLabel2.classList.add('cursor-not-allowed');
-             fileInput2.disabled = true;
-        }
-
         dateDisplay1.innerHTML = '';
         dateDisplay2.innerHTML = '';
         dateDisplayChurn.innerHTML = '';
@@ -296,15 +275,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 header: true,
                 skipEmptyLines: true,
                 complete: (results) => {
-                    // NEW: Filter out "Grand Total" rows or rows with empty Phone Numbers
                     const validRows = results.data.filter(row => {
                          const phone = row['Phone Number'];
                          const name = row['First Name'];
                          
-                         // Must have a phone number (key identifier)
                          if (!phone || typeof phone !== 'string' || phone.trim() === '') return false;
-                         
-                         // Explicitly exclude rows labeled "Grand Total" or "Total"
                          if (name && /^(grand )?total$/i.test(name.trim())) return false;
                          
                          return true;
@@ -315,60 +290,19 @@ document.addEventListener('DOMContentLoaded', () => {
                         'Transaction Count': parseInt(row['Transaction Count'], 10) || 0,
                         'SKU Count': parseInt(row['SKU Count'], 10) || 0,
                         'Total Amount': parseFloat(row['Total Amount']) || 0,
-                        'State': row['State'] || 'N/A', // Pick up State
-                        'Store Type': row['Store Type'] || 'N/A' // Pick up Store Type
+                        'State': row['State'] || 'N/A',
+                        'Store Type': row['Store Type'] || 'N/A'
                     }));
 
                     if (period === 1) dataPeriod1 = parsedData;
                     else if (period === 2) dataPeriod2 = parsedData;
                     else if (period === 'churn') churnUserDetails = parsedData;
                     
-                    resolve(parsedData); // Resolve with the data
+                    resolve(parsedData); 
                 },
                 error: (error) => reject(new Error(`CSV Parsing Error: ${error.message}`))
             });
         });
-    };
-
-    const handleFileUpload = async (file, period) => {
-        if (!file) return;
-
-        resetError();
-        loadingOverlay.classList.remove('hidden');
-        showStatus(`Processing ${file.name}...`);
-        period2Label = null; 
-
-        const dateRange = { start: 'File', end: 'Data' };
-
-        const reader = new FileReader();
-        reader.onload = async (e) => {
-            try {
-                await parseAndProcessData(e.target.result, period);
-                if (period === 1) {
-                    dateRange1 = dateRange;
-                    fileName1.textContent = file.name;
-                    dateRangeEl1.textContent = '';
-                    enablePeriod2Upload();
-                    hideStatus();
-                } else {
-                    dateRange2 = dateRange;
-                    fileName2.textContent = file.name;
-                    dateRangeEl2.textContent = '';
-                    churnUserDetails = dataPeriod1; 
-                    await analyzeData();
-                    hideStatus();
-                    dashboard.classList.remove('hidden');
-                    dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
-                }
-            } catch (error) {
-                showError(error.message);
-            } finally {
-                 if (period === 2) {
-                    loadingOverlay.classList.add('hidden');
-                 }
-            }
-        };
-        reader.readAsText(file);
     };
 
     const handleApiFetch = async () => {
@@ -441,14 +375,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    const enablePeriod2Upload = () => {
-        uploadContainer2.classList.remove('disabled');
-        uploadLabel2.classList.remove('cursor-not-allowed');
-        uploadLabel2.classList.add('cursor-pointer');
-        fileInput2.disabled = false;
-        fileName2.textContent = 'Drag & drop or click to upload';
-    };
-
     const analyzeData = async () => {
         showStatus('Analyzing data...');
         
@@ -468,19 +394,17 @@ document.addEventListener('DOMContentLoaded', () => {
             const p1Data = dataPeriod1.find(u => u['Phone Number'] === phone);
             const details = churnDetailsMap.get(phone);
             return {
-                ...p1Data, // Data from period 1 (last active period)
-                ...details, // Enriched data from churn endpoint (like Referral Code, Store Name, etc.)
+                ...p1Data, 
+                ...details, 
                 'Created Date': details ? details['Created Date'] : (p1Data ? p1Data['Created Date'] : null),
                 'Store Name': details ? details['Store Name'] : (p1Data ? p1Data['Store Name'] : 'N/A'),
                 'Store Address': details ? details['Store Address'] : (p1Data ? p1Data['Store Address'] : 'N/A'),
                 'LGA': details ? details['LGA'] : (p1Data ? p1Data['LGA'] : 'N/A'),
-                // Referral Code will be carried over from 'details' if it exists
             };
         });
         
         const retentionRate = usersP1PhoneNumbers.size > 0 ? (retainedUsersSet.size / usersP1PhoneNumbers.size * 100).toFixed(1) : 0;
         
-        // --- NEW: Calculate High Frequency Users (More than 10 transactions) ---
         const highFreqCount = dataPeriod2.filter(u => (u['Transaction Count'] || 0) > 10).length;
 
         document.getElementById('retention-rate').textContent = `${retentionRate}%`;
@@ -505,7 +429,7 @@ document.addEventListener('DOMContentLoaded', () => {
         tableTitle.textContent = `Active Users: ${period2Text}`;
         tableDescription.textContent = `Showing ${dataPeriod2.length} total users in this period.`;
 
-        // 90-DAY CHART RENDERING
+        // Restored canvas clear checks
         if (dateRange2 && dateRange2.end && dateRange2.end !== 'Data') {
              await fetchAndRender90DayCharts(dateRange2.end);
         } else {
@@ -515,14 +439,14 @@ document.addEventListener('DOMContentLoaded', () => {
             userCtx.font = "16px Inter";
             userCtx.fillStyle = "#64748b";
             userCtx.textAlign = "center";
-            userCtx.fillText("90-day trend not available for file uploads.", userCtx.canvas.width / 2, 50);
+            userCtx.fillText("90-day trend not available.", userCtx.canvas.width / 2, 50);
 
             const transCtx = document.getElementById('transaction-chart').getContext('2d');
             transCtx.clearRect(0, 0, transCtx.canvas.width, transCtx.canvas.height);
             transCtx.font = "16px Inter";
             transCtx.fillStyle = "#64748b";
             transCtx.textAlign = "center";
-            transCtx.fillText("90-day trend not available for file uploads.", transCtx.canvas.width / 2, 50);
+            transCtx.fillText("90-day trend not available.", transCtx.canvas.width / 2, 50);
         }
         
         reportData = {
@@ -530,11 +454,11 @@ document.addEventListener('DOMContentLoaded', () => {
             newUsers: newUsersSet.size,
             churnedUsers: churnedData.length,
             totalActiveUsers: usersP2PhoneNumbers.size,
-            highFreqCount: highFreqCount, // Stored for report
+            highFreqCount: highFreqCount, 
             period1Text: period1Text,
             period2Text: period2Text,
             periodLabel: period2Label,
-            isApiMode: !fileInput1.files[0] && !fileInput2.files[0],
+            isApiMode: true,
             apiParams: {
                 start1: dateRange1 ? dateRange1.start : null,
                 end1: dateRange1 ? dateRange1.end : null,
@@ -587,21 +511,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
 Verification Link:
 ${analysisUrl}`;
 
-        } else {
-            summaryText = `Report Summary: File 1 vs. File 2
-(Auto-generated with Pika-RS)
-
-Date & Time Stamp of Generated Report: ${timestamp}
-
-- Retention: ${reportData.retentionRate}% of users from your first file (Period 1) were also present in your second file (Period 2).
-
-- New Users: ${reportData.newUsers} users were present in the second file but not in the first.
-
-- Churn: ${reportData.churnedUsers} users from the first file were missing from the second file.
-
-- Total Active Users: The second file contains a total of ${reportData.totalActiveUsers} users.
-
-- Transaction Frequency: Of the ${reportData.totalActiveUsers} total active users in the second file, only ${reportData.highFreqCount} recorded sales more than 10 times in total.`;
         }
         
         reportContent.textContent = summaryText;
@@ -691,7 +600,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
             });
             buttonsWrapper.appendChild(viewAllBtn);
         } else if (popupId === 'retained-popup' || popupId === 'total-popup') {
-             // --- NEW: Add AE Retention View Button ---
              const viewAeBtn = document.createElement('button');
              viewAeBtn.textContent = 'AE Analysis';
              viewAeBtn.className = 'popup-action-btn';
@@ -710,22 +618,17 @@ Date & Time Stamp of Generated Report: ${timestamp}
         container.appendChild(footer);
     };
 
-    // --- NEW FUNCTION: AE RETENTION ANALYSIS ---
     const expandRetentionPopup = (container, title, data) => {
         container.classList.add('expanded');
         
-        // 1. Map Period 1 data for comparison (Performance across periods)
-        // We want to see if the user grew or declined in volume compared to the previous period
         const p1Map = new Map();
         if (dataPeriod1 && dataPeriod1.length > 0) {
             dataPeriod1.forEach(u => p1Map.set(u['Phone Number'], u));
         }
 
-        // 2. Aggregate Data by AE (Referral Code)
         const aeStats = {};
         
         data.forEach(user => {
-            // Normalize AE Name
             const ae = user['Referral Code'] && user['Referral Code'].trim() !== "" 
                        ? user['Referral Code'] 
                        : "Unassigned/Direct";
@@ -736,7 +639,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
                     users: 0, 
                     txns: 0, 
                     amount: 0,
-                    p1Amount: 0 // To track volume from previous period for retained users
+                    p1Amount: 0 
                 };
             }
             
@@ -745,19 +648,15 @@ Date & Time Stamp of Generated Report: ${timestamp}
             const currentAmount = (user['Total Amount'] || 0);
             aeStats[ae].amount += currentAmount;
             
-            // Get P1 stats if available
             const p1User = p1Map.get(user['Phone Number']);
             if (p1User) {
                 aeStats[ae].p1Amount += (p1User['Total Amount'] || 0);
             }
         });
 
-        // 3. Convert to Array and Sort by Total Amount (Performance)
         const sortedStats = Object.values(aeStats).sort((a, b) => b.amount - a.amount);
         const totalSystemAmount = sortedStats.reduce((sum, item) => sum + item.amount, 0);
 
-        // 4. Construct Header
-        // CHANGED: Added date range and removed fullscreen button
         const periodText = formatPeriodText(dateRange2);
         
         const managementHeader = document.createElement('div');
@@ -769,7 +668,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
             </div>
         `;
 
-        // 5. Construct Table
         const tableContainer = document.createElement('div');
         tableContainer.className = 'popup-table-container';
         
@@ -807,7 +705,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
             </table>
         `;
 
-        // 6. Construct Footer
         const footer = document.createElement('div');
         footer.className = 'popup-footer';
         
@@ -826,7 +723,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
                 container.classList.remove('fullscreen');
                 document.body.classList.remove('fullscreen-active');
             }
-            // Re-render the original table
             createPopupTable(container.id, container.id === 'retained-popup' ? 'Retained Users' : 'Total Active Users', data);
         });
 
@@ -852,7 +748,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
         buttonsWrapper.appendChild(copyButton);
         footer.appendChild(buttonsWrapper);
 
-        // 7. Assemble
         container.innerHTML = '';
         container.appendChild(managementHeader);
         container.appendChild(tableContainer);
@@ -861,9 +756,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
 
     const expandChurnPopup = (container, title, data) => {
         container.classList.add('expanded');
-
-        // This logic is now handled inline inside the data.map loop
-        // const executiveOptions = `<option value="">Assign...</option>` + accountExecutives.map(name => `<option value="${name}">${name}</option>`).join('');
 
         const managementHeader = document.createElement('div');
         managementHeader.className = 'management-header';
@@ -899,14 +791,11 @@ Date & Time Stamp of Generated Report: ${timestamp}
                     ${data.map(row => {
                         const referralCode = row['Referral Code'];
                         let referralOption = '';
-                        // Check if a referral code exists and if it's NOT already in the main AE list
                         if (referralCode && !accountExecutives.includes(referralCode)) {
                             referralOption = `<option value="${referralCode}" selected>${referralCode} (Referral)</option>`;
                         }
 
-                        // Build the standard AE options
                         const standardOptions = accountExecutives.map(name => {
-                            // If the referral code IS one of the AEs, select it
                             const isSelected = (referralCode && name === referralCode) ? 'selected' : '';
                             return `<option value="${name}" ${isSelected}>${name}</option>`;
                         }).join('');
@@ -1072,23 +961,15 @@ Date & Time Stamp of Generated Report: ${timestamp}
             return;
         }
         try {
-            // OPTIMIZATION (V2):
-            // Instead of storing full user objects (Name, Store, Address, etc.),
-            // we only store the reconstruction recipe:
-            // 1. API URL + Dates (to fetch the raw data)
-            // 2. Map of Phone Number -> Assigned AE Index
-            
-            // Extract unique AEs to index them
             const uniqueAEs = [...new Set(assignedUsers.map(u => u.assignedAE).filter(Boolean))];
             
-            // Map users to [PhoneNumber, AE_Index]
             const assignments = assignedUsers.map(u => {
                 const aeIndex = uniqueAEs.indexOf(u.assignedAE);
                 return [u['Phone Number'], aeIndex];
             });
 
             const monitorData = {
-                v: 2, // Version 2 flag
+                v: 2,
                 api: apiUrlInput.value.trim(),
                 d1: { s: dateRange1.start, e: dateRange1.end },
                 d2: { s: dateRange2.start, e: dateRange2.end },
@@ -1099,18 +980,19 @@ Date & Time Stamp of Generated Report: ${timestamp}
             };
 
             const jsonString = JSON.stringify(monitorData);
-            const compressed = pako.deflate(jsonString);
-
-            // UPDATED SAFE GENERATION: Avoid 'Maximum call stack size exceeded'
-            let binary = '';
-            const len = compressed.length;
-            for (let i = 0; i < len; i++) {
-                binary += String.fromCharCode(compressed[i]);
+            const compressed = window.pako ? window.pako.deflate(jsonString) : null;
+            let base64String = '';
+            
+            if (compressed) {
+                let binary = '';
+                for (let i = 0; i < compressed.length; i++) {
+                    binary += String.fromCharCode(compressed[i]);
+                }
+                base64String = btoa(binary);
             }
-            const base64String = btoa(binary);
 
             const url = new URL('monitor.html', window.location.href);
-            url.hash = base64String;
+            if (base64String) url.hash = base64String;
             
             window.open(url.href, '_blank');
 
@@ -1124,7 +1006,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
         dataTable.innerHTML = '';
         noResultsEl.classList.toggle('hidden', data.length > 0);
         
-        // Check checkbox state for initial rendering
         const isSkuVisible = skuToggle && skuToggle.checked;
         const skuClass = isSkuVisible ? 'sku-column' : 'sku-column hidden';
 
@@ -1158,16 +1039,13 @@ Date & Time Stamp of Generated Report: ${timestamp}
             fragment.appendChild(tr);
         });
 
-        // NEW: Calculate Totals based on filtered data
         const totalTxn = data.reduce((sum, row) => sum + (row['Transaction Count'] || 0), 0);
         const totalSku = data.reduce((sum, row) => sum + (row['SKU Count'] || 0), 0);
         const totalAmt = data.reduce((sum, row) => sum + (row['Total Amount'] || 0), 0);
 
-        // NEW: Create Grand Total Row
         if (data.length > 0) {
             const totalRow = document.createElement('tr');
             totalRow.className = 'bg-slate-50 dark:bg-slate-700 font-bold border-t-2 border-slate-300 dark:border-slate-500';
-            // FIXED: Ensure exactly 13 columns match the header structure.
             totalRow.innerHTML = `
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
                 <td class="px-6 py-4 whitespace-nowrap text-sm text-slate-500"></td>
@@ -1191,8 +1069,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
 
     const destroyCharts = () => { Object.values(charts).forEach(chart => { if (chart) chart.destroy(); }); charts = {}; };
 
-    // --- NEW 90-DAY CHARTING LOGIC ---
-
     const fetchAndRender90DayCharts = async (endDateStr) => {
         const baseUrl = apiUrlInput.value.trim();
         if (!baseUrl || !endDateStr) return;
@@ -1206,7 +1082,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
         const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
         let currentEnd = new Date(endDate);
 
-        if (endDate.getDate() < 28) { // If period is not a full month, go back to previous full month's end
+        if (endDate.getDate() < 28) { 
             currentEnd = new Date(endDate.getFullYear(), endDate.getMonth(), 0);
         }
         
@@ -1218,8 +1094,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
                 start: toYYYYMMDD(pStart),
                 end: toYYYYMMDD(pEnd)
             });
-            // This logic correctly handles all month lengths (30, 31, 28, 29 days)
-            currentEnd = new Date(pStart.getFullYear(), pStart.getMonth(), 0); // End of previous month
+            currentEnd = new Date(pStart.getFullYear(), pStart.getMonth(), 0); 
         }
 
         const urls = periods.map(p => `${retentionEndpoint}?download=retained-user-stats&startDate=${p.start}&endDate=${p.end}`);
@@ -1233,8 +1108,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
             const allPeriodsData = await Promise.all(csvTexts.map(csv => parseAndProcessData(csv)));
 
             const chartMetrics = [];
-            // This loop correctly calculates metrics for the last 3 months by comparing each to its prior month.
-            // This ensures the data for both charts is accurate and synchronized.
             for (let i = 1; i < allPeriodsData.length; i++) {
                 const priorPeriodData = allPeriodsData[i - 1];
                 const currentPeriodData = allPeriodsData[i];
@@ -1337,7 +1210,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
                 type: 'line',
                 xMin: i + 0.5,
                 xMax: i + 0.5,
-                borderColor: 'rgba(203, 213, 225, 0.7)', // slate-300 with opacity
+                borderColor: 'rgba(203, 213, 225, 0.7)',
                 borderWidth: 1,
                 borderDash: [6, 6],
             };
@@ -1370,7 +1243,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
                     legend: { position: 'top', labels: { usePointStyle: true, boxWidth: 8, padding: 20 } },
                     title: { display: false },
                     tooltip: {
-                        backgroundColor: 'rgba(15, 23, 42, 0.85)', // slate-900
+                        backgroundColor: 'rgba(15, 23, 42, 0.85)',
                         titleFont: { weight: 'bold' },
                         bodySpacing: 8,
                         padding: 12,
@@ -1425,7 +1298,7 @@ Date & Time Stamp of Generated Report: ${timestamp}
                         beginAtZero: true,
                         suggestedMax: suggestedMaxUsers,
                         title: { display: true, text: 'User Count', font: { weight: 'bold' } },
-                        grid: { color: '#e2e8f0' } // slate-200
+                        grid: { color: '#e2e8f0' }
                     },
                     y1: {
                         type: 'linear',
@@ -1506,10 +1379,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
         });
     };
 
-
-    // --- EVENT LISTENERS & INITIALIZATION ---
-    fileInput1.addEventListener('change', () => handleFileUpload(fileInput1.files[0], 1));
-    fileInput2.addEventListener('change', () => handleFileUpload(fileInput2.files[0], 2));
     fetchApiBtn.addEventListener('click', handleApiFetch);
 
     reportInfoIcon.addEventListener('click', showReportModal);
@@ -1517,7 +1386,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
     reportModalOverlay.addEventListener('click', hideReportModal);
     copyReportBtn.addEventListener('click', copyReport);
 
-    // SKU Toggle Logic
     if (skuToggle) {
         skuToggle.addEventListener('change', () => {
             const cells = document.querySelectorAll('.sku-column');
@@ -1531,7 +1399,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
         });
     }
 
-    // State Toggle Logic
     if (stateToggle) {
         stateToggle.addEventListener('change', () => {
             const cells = document.querySelectorAll('.state-column');
@@ -1545,7 +1412,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
         });
     }
 
-    // Store Type Toggle Logic
     if (storeTypeToggle) {
         storeTypeToggle.addEventListener('change', () => {
             const cells = document.querySelectorAll('.store-type-column');
@@ -1559,7 +1425,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
         });
     }
 
-    // Last Name Toggle Logic
     if (lastNameToggle) {
         lastNameToggle.addEventListener('change', () => {
             const cells = document.querySelectorAll('.last-name-column');
@@ -1580,12 +1445,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
         resetDashboard();
     });
 
-    [uploadContainer1, uploadContainer2].forEach((container, index) => {
-        container.addEventListener('dragover', (e) => { e.preventDefault(); if (!container.classList.contains('disabled')) container.classList.add('dragover'); });
-        container.addEventListener('dragleave', (e) => { e.preventDefault(); container.classList.remove('dragover'); });
-        container.addEventListener('drop', (e) => { e.preventDefault(); container.classList.remove('dragover'); if (!container.classList.contains('disabled')) { const files = e.dataTransfer.files; if (files.length) { const fileInput = index === 0 ? fileInput1 : fileInput2; fileInput.files = files; handleFileUpload(files[0], index + 1); } } });
-    });
-
     [apiStart1Input, apiEnd1Input, apiStart2Input, apiEnd2Input, apiStartChurnInput, apiEndChurnInput].forEach(input => {
         input.addEventListener('change', () => {
              period2Label = null;
@@ -1600,20 +1459,16 @@ Date & Time Stamp of Generated Report: ${timestamp}
         const min = parseInt(minTransInput.value, 10);
         const max = parseInt(maxTransInput.value, 10);
         const searchTerm = searchInput.value.toLowerCase().trim();
-        const searchCol = searchColumnSelect.value; // NEW: Get dropdown value
+        const searchCol = searchColumnSelect.value; 
 
         filteredData = dataPeriod2.filter(row => {
-            // 1. Transaction Count Filter
             const count = row['Transaction Count'];
             const minMatch = isNaN(min) || count >= min;
             const maxMatch = isNaN(max) || count <= max;
             if (!minMatch || !maxMatch) return false;
 
-            // 2. Search Filter
             if (searchTerm) {
                 if (searchCol === 'all') {
-                    // Search ALL visible columns (including new ones)
-                    // We construct a comprehensive string of all searchable fields
                     const searchableValues = [
                         row['First Name'], 
                         row['Last Name'], 
@@ -1628,7 +1483,6 @@ Date & Time Stamp of Generated Report: ${timestamp}
                     
                     return searchableValues.some(val => val.includes(searchTerm));
                 } else {
-                    // Strict Column Search
                     const cellValue = (row[searchCol] || '').toString().toLowerCase();
                     return cellValue.includes(searchTerm);
                 }
@@ -1637,12 +1491,10 @@ Date & Time Stamp of Generated Report: ${timestamp}
             return true;
         });
 
-        // --- NEW: Update Header Count ---
         if (dataPeriod2.length > 0) {
             const count = filteredData.length;
             const total = dataPeriod2.length;
             
-            // Check if active search or filters are present
             if (searchTerm || !isNaN(min) || !isNaN(max)) {
                  tableDescription.innerHTML = `Found <span class="font-bold text-slate-900 dark:text-white">${count}</span> matching results (out of ${total}).`;
             } else {
@@ -1655,18 +1507,10 @@ Date & Time Stamp of Generated Report: ${timestamp}
     minTransInput.addEventListener('input', applyFilters);
     maxTransInput.addEventListener('input', applyFilters);
     searchInput.addEventListener('input', applyFilters);
-    searchColumnSelect.addEventListener('change', applyFilters); // NEW: Trigger search on dropdown change
+    searchColumnSelect.addEventListener('change', applyFilters);
 
     exportBtn.addEventListener('click', () => {
         if (filteredData.length === 0) { alert('No data to export.'); return; }
-        // Updated Export Columns
-        const columnsToExport = ['First Name', 'Last Name', 'Phone Number', 'Referral Code', 'LGA', 'Store Name', 'Store Address', 'Transaction Count', 'SKU Count', 'Total Amount'];
-        
-        // Add new columns if data exists for them (simplistic check, or just add them always)
-        // Let's add them conditionally or just add them.
-        // User asked to surface them in table, so exporting them makes sense.
-        // Since we are unparsing filteredData, let's just use all fields or insert them correctly.
-        // To be safe and keep order:
         const exportColumns = [
             'First Name', 'Last Name', 'Phone Number', 'Referral Code', 
             'LGA', 'State', 'Store Name', 'Store Type', 'Store Address', 
@@ -1701,11 +1545,9 @@ Date & Time Stamp of Generated Report: ${timestamp}
             btn.textContent = preset.label;
             btn.type = 'button';
             btn.addEventListener('click', (e) => {
-                // Remove active class from siblings
                 const siblings = targetConfig.container.querySelectorAll('.date-preset-btn');
                 siblings.forEach(s => s.classList.remove('active'));
                 
-                // Add active class to clicked button
                 btn.classList.add('active');
                 
                 let start, end;
@@ -1828,9 +1670,292 @@ Date & Time Stamp of Generated Report: ${timestamp}
         }, 100);
     };
 
+    // --- NEW: Local safely formatted date for Weekly Monitor only ---
+    const toLocalYYYYMMDD = (d) => {
+        const pad = n => n < 10 ? '0' + n : n;
+        return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
+    };
+
+    // --- NEW: Background Live Weekly Monitor Setup ---
+    const setupWeeklyMonitor = async () => {
+        const container = document.getElementById('weekly-monitor-content');
+        if (!container) return;
+
+        // Safely set the current day to 12 PM (noon) to dodge UTC offsets
+        const now = new Date();
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 12, 0, 0, 0); 
+        const dayOfWeek = today.getDay();
+
+        let anchorSunday = new Date(today);
+        if (dayOfWeek !== 0) {
+            anchorSunday.setDate(today.getDate() - dayOfWeek);
+        }
+
+        // Current Week Definition (Anchor Sunday to Next Sunday)
+        const currentWeekStart = anchorSunday;
+        const currentWeekEnd = new Date(anchorSunday);
+        currentWeekEnd.setDate(anchorSunday.getDate() + 7);
+
+        // Previous Week Definition (Previous Sunday to Anchor Sunday)
+        const previousWeekStart = new Date(anchorSunday);
+        previousWeekStart.setDate(anchorSunday.getDate() - 7);
+        const previousWeekEnd = anchorSunday;
+
+        const baseUrl = document.getElementById('api-url').value.trim() || 'https://pika-inventory-94729b833f18.herokuapp.com/api/v1/admin/analytics/retention';
+        const retentionEndpoint = baseUrl.replace('/churn', '/retention');
+
+        const parseCSV = (csvText) => {
+            return new Promise((resolve) => {
+                Papa.parse(csvText, {
+                    header: true,
+                    skipEmptyLines: true,
+                    complete: (results) => {
+                        const validRows = results.data.filter(row => {
+                            const phone = row['Phone Number'];
+                            const name = row['First Name'];
+                            if (!phone || typeof phone !== 'string' || phone.trim() === '') return false;
+                            if (name && /^(grand )?total$/i.test(name.trim())) return false;
+                            return true;
+                        });
+                        resolve(validRows);
+                    }
+                });
+            });
+        };
+
+        const getWeekData = async (weekStart, weekEnd) => {
+            try {
+                // Determine baseline observation dates for churn analysis
+                const d2Start = new Date(weekStart);
+                d2Start.setDate(weekStart.getDate() - 7);
+                const d2End = new Date(weekStart);
+
+                const d1End = new Date(d2Start);
+                d1End.setDate(d2Start.getDate() - 1);
+                const d1Start = new Date(d2Start);
+                d1Start.setDate(d2Start.getDate() - 30);
+
+                const urlP1 = `${retentionEndpoint}?download=retained-user-stats&startDate=${toLocalYYYYMMDD(d1Start)}&endDate=${toLocalYYYYMMDD(d1End)}`;
+                const urlP2 = `${retentionEndpoint}?download=retained-user-stats&startDate=${toLocalYYYYMMDD(d2Start)}&endDate=${toLocalYYYYMMDD(d2End)}`;
+                const urlChurnDetails = `${retentionEndpoint}?download=churned-users&startDate=${toLocalYYYYMMDD(d1Start)}&endDate=${toLocalYYYYMMDD(d1End)}`;
+
+                const [res1, res2, resChurn] = await Promise.all([fetch(urlP1), fetch(urlP2), fetch(urlChurnDetails)]);
+                if (!res1.ok || !res2.ok || !resChurn.ok) throw new Error("API Fetch failed for monitor generation.");
+
+                const [csv1, csv2, csvChurn] = await Promise.all([res1.text(), res2.text(), resChurn.text()]);
+
+                const p1Data = await parseCSV(csv1);
+                const p2Data = await parseCSV(csv2);
+                const churnDetails = await parseCSV(csvChurn);
+
+                const p1Phones = new Set(p1Data.map(u => u['Phone Number']));
+                const p2Phones = new Set(p2Data.map(u => u['Phone Number']));
+                const churnedPhones = [...p1Phones].filter(p => !p2Phones.has(p));
+
+                const churnMap = new Map(churnDetails.map(u => [u['Phone Number'], u]));
+
+                const assignedUsers = churnedPhones.map(phone => {
+                    const base = p1Data.find(u => u['Phone Number'] === phone);
+                    const det = churnMap.get(phone) || {};
+                    return {
+                        ...base,
+                        ...det,
+                        assignedAE: det['Referral Code'] || base['Referral Code'] || 'Unassigned'
+                    };
+                });
+
+                const uniqueAEs = [...new Set(assignedUsers.map(u => u.assignedAE))];
+                const assignments = assignedUsers.map(u => {
+                    const aeIndex = uniqueAEs.indexOf(u.assignedAE);
+                    return [u['Phone Number'], aeIndex];
+                });
+
+                const monitorData = {
+                    v: 2,
+                    api: baseUrl,
+                    d1: { s: toLocalYYYYMMDD(d1Start), e: toLocalYYYYMMDD(d1End) },
+                    d2: { s: toLocalYYYYMMDD(d2Start), e: toLocalYYYYMMDD(d2End) },
+                    due: toLocalYYYYMMDD(weekEnd),
+                    cr: weekStart.toISOString(),
+                    aes: uniqueAEs,
+                    a: assignments
+                };
+
+                const jsonString = JSON.stringify(monitorData);
+                const compressed = window.pako ? window.pako.deflate(jsonString) : null;
+                let base64String = '';
+                
+                if (compressed) {
+                    let binary = '';
+                    for (let i = 0; i < compressed.length; i++) {
+                        binary += String.fromCharCode(compressed[i]);
+                    }
+                    base64String = btoa(binary);
+                }
+
+                const monitorUrl = new URL('monitor.html', window.location.href);
+                if (base64String) monitorUrl.hash = base64String;
+
+                // Live stats fetch perfectly synced
+                const monitorCreationDate = weekStart;
+
+                const dateBufferStart = new Date(monitorCreationDate);
+                dateBufferStart.setDate(dateBufferStart.getDate() - 1);
+
+                const dateStrictStart = new Date(monitorCreationDate);
+
+                const dateHistoricalStart = new Date(monitorCreationDate);
+                dateHistoricalStart.setDate(dateHistoricalStart.getDate() - 360);
+                const dateHistoricalEnd = new Date(monitorCreationDate);
+
+                let limitDate = new Date();
+                const dueEnd = new Date(weekEnd);
+                dueEnd.setDate(dueEnd.getDate() - 1);
+                dueEnd.setHours(23, 59, 59, 999);
+                if (limitDate > dueEnd) {
+                    limitDate = dueEnd;
+                }
+
+                const currentEndDate = new Date(limitDate);
+                currentEndDate.setDate(currentEndDate.getDate() + 1);
+
+                const urlOnboarding = `${retentionEndpoint}?download=retained-user-stats&startDate=${toLocalYYYYMMDD(dateBufferStart)}&endDate=${toLocalYYYYMMDD(currentEndDate)}`;
+                const urlActivity = `${retentionEndpoint}?download=retained-user-stats&startDate=${toLocalYYYYMMDD(dateStrictStart)}&endDate=${toLocalYYYYMMDD(currentEndDate)}`;
+                const urlHistorical = `${retentionEndpoint}?download=retained-user-stats&startDate=${toLocalYYYYMMDD(dateHistoricalStart)}&endDate=${toLocalYYYYMMDD(dateHistoricalEnd)}`;
+
+                const [resOnb, resAct, resHist] = await Promise.all([fetch(urlOnboarding), fetch(urlActivity), fetch(urlHistorical)]);
+                if (!resOnb.ok || !resAct.ok || !resHist.ok) throw new Error("API Fetch live stats failed.");
+
+                const [csvOnb, csvAct, csvHist] = await Promise.all([resOnb.text(), resAct.text(), resHist.text()]);
+
+                const onboardingData = await parseCSV(csvOnb);
+                const activityData = await parseCSV(csvAct);
+                const historicalData = await parseCSV(csvHist);
+
+                const histPhones = new Set(historicalData.map(u => u['Phone Number']));
+                const monitoredPhones = new Set(assignedUsers.map(u => u['Phone Number']));
+
+                let onboardingCount = 0;
+                onboardingData.forEach(u => {
+                    const phone = u['Phone Number'];
+                    if (!histPhones.has(phone) && !monitoredPhones.has(phone)) {
+                        onboardingCount++;
+                    }
+                });
+
+                let reactivatedCount = 0;
+                let organicCount = 0;
+                activityData.forEach(u => {
+                    const phone = u['Phone Number'];
+                    const isHist = histPhones.has(phone);
+                    const isMon = monitoredPhones.has(phone);
+
+                    if (isHist || isMon) {
+                        if (isMon) reactivatedCount++;
+                        else organicCount++;
+                    }
+                });
+
+                return {
+                    onboarding: onboardingCount,
+                    reactivated: reactivatedCount,
+                    organic: organicCount,
+                    link: monitorUrl.href,
+                    startStr: weekStart.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+                    endStr: weekEnd.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+                    error: false
+                };
+
+            } catch (err) {
+                console.error("Error generating week data:", err);
+                return {
+                    onboarding: '--',
+                    reactivated: '--',
+                    organic: '--',
+                    link: '#',
+                    startStr: weekStart.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+                    endStr: weekEnd.toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }),
+                    error: true
+                };
+            }
+        };
+
+        try {
+            // Concurrent execution for both monitors
+            const [currentWk, prevWk] = await Promise.all([
+                getWeekData(currentWeekStart, currentWeekEnd),
+                getWeekData(previousWeekStart, previousWeekEnd)
+            ]);
+
+            const buildCard = (title, data, isPrimary) => {
+                const bgClass = isPrimary ? "bg-white dark:bg-slate-800" : "bg-slate-50 dark:bg-slate-800/50 opacity-90";
+                const borderClass = isPrimary ? "border-slate-200 dark:border-slate-700 shadow-sm" : "border-slate-200 dark:border-slate-700 shadow-none";
+                const pointerClass = data.error ? "opacity-50 cursor-not-allowed pointer-events-none" : "";
+                
+                return `
+                    <div class="${bgClass} border ${borderClass} rounded-xl p-5 mb-4 last:mb-0 transition-all">
+                        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-4 gap-3">
+                            <div>
+                                <h4 class="text-sm font-semibold uppercase tracking-wider text-slate-500 dark:text-slate-400">${title}</h4>
+                                <h3 class="text-lg font-bold text-slate-800 dark:text-white mt-1">${data.startStr} to ${data.endStr}</h3>
+                            </div>
+                            <a href="${data.link}" target="_blank" class="bg-blue-600 hover:bg-blue-700 text-white font-medium py-1.5 px-4 rounded-md shadow-sm transition-colors text-sm flex items-center gap-2 ${pointerClass}">
+                                Open Monitor
+                                <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                            </a>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div class="bg-violet-50 dark:bg-violet-900/20 border border-violet-100 dark:border-violet-800/50 p-3 rounded-lg flex items-center">
+                                <div class="bg-violet-200 dark:bg-violet-800 text-violet-700 dark:text-violet-200 p-2 rounded-full mr-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z" /></svg>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-violet-600 dark:text-violet-400">Onboarding</p>
+                                    <p class="text-xl font-bold text-slate-800 dark:text-white">${data.onboarding}</p>
+                                </div>
+                            </div>
+                            <div class="bg-green-50 dark:bg-green-900/20 border border-green-100 dark:border-green-800/50 p-3 rounded-lg flex items-center">
+                                <div class="bg-green-200 dark:bg-green-800 text-green-700 dark:text-green-200 p-2 rounded-full mr-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-green-600 dark:text-green-400">Reactivation-based</p>
+                                    <p class="text-xl font-bold text-slate-800 dark:text-white">${data.reactivated}</p>
+                                </div>
+                            </div>
+                            <div class="bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-800/50 p-3 rounded-lg flex items-center">
+                                <div class="bg-blue-200 dark:bg-blue-800 text-blue-700 dark:text-blue-200 p-2 rounded-full mr-3">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                                </div>
+                                <div>
+                                    <p class="text-xs font-medium text-blue-600 dark:text-blue-400">Organic Active</p>
+                                    <p class="text-xl font-bold text-slate-800 dark:text-white">${data.organic}</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            };
+
+            container.innerHTML = `
+                <div class="p-6 transition-all bg-slate-50 dark:bg-slate-900/50 rounded-b-xl">
+                    ${buildCard("Current Week", currentWk, true)}
+                    ${buildCard("Previous Week", prevWk, false)}
+                </div>
+            `;
+
+        } catch (err) {
+            console.error("Weekly Monitor Background Process Error:", err);
+            container.innerHTML = `<div class="p-6 text-center text-red-500 font-medium"><p>Failed to generate live weekly insights.</p></div>`;
+        }
+    };
+
     // Initial setup on page load
     cohortInputs.classList.add('hidden');
     churnInputs.classList.remove('hidden');
     initDatePresets();
+    setupWeeklyMonitor();
     autorunFromUrl();
 });
