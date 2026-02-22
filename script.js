@@ -103,6 +103,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const maxTransInput = document.getElementById('max-trans');
     const searchInput = document.getElementById('search-input');
     const searchColumnSelect = document.getElementById('search-column-select');
+    const statusFilterSelect = document.getElementById('status-filter');
     const exportBtn = document.getElementById('export-csv');
     const noResultsEl = document.getElementById('no-results');
     const tableDescription = document.getElementById('table-description');
@@ -222,6 +223,8 @@ document.addEventListener('DOMContentLoaded', () => {
         reportData = {};
         reportInfoIcon.classList.add('hidden');
         
+        if (statusFilterSelect) statusFilterSelect.value = 'all';
+
         const legendEl = document.getElementById('user-table-legend');
         if (legendEl) legendEl.classList.add('hidden');
         
@@ -1513,12 +1516,17 @@ ${analysisUrl}`;
         const max = parseInt(maxTransInput.value, 10);
         const searchTerm = searchInput.value.toLowerCase().trim();
         const searchCol = searchColumnSelect.value; 
+        const statusFilter = statusFilterSelect ? statusFilterSelect.value : 'all';
 
         filteredData = dataPeriod2.filter(row => {
             const count = row['Transaction Count'];
             const minMatch = isNaN(min) || count >= min;
             const maxMatch = isNaN(max) || count <= max;
             if (!minMatch || !maxMatch) return false;
+
+            if (statusFilter !== 'all' && row.status !== statusFilter) {
+                return false;
+            }
 
             if (searchTerm) {
                 if (searchCol === 'all') {
@@ -1548,7 +1556,7 @@ ${analysisUrl}`;
             const count = filteredData.length;
             const total = dataPeriod2.length;
             
-            if (searchTerm || !isNaN(min) || !isNaN(max)) {
+            if (searchTerm || !isNaN(min) || !isNaN(max) || statusFilter !== 'all') {
                  tableDescription.innerHTML = `Found <span class="font-bold text-slate-900 dark:text-white">${count}</span> matching results (out of ${total}).`;
             } else {
                  tableDescription.textContent = `Showing all ${total} users in this period.`;
@@ -1561,6 +1569,7 @@ ${analysisUrl}`;
     maxTransInput.addEventListener('input', applyFilters);
     searchInput.addEventListener('input', applyFilters);
     searchColumnSelect.addEventListener('change', applyFilters);
+    if (statusFilterSelect) statusFilterSelect.addEventListener('change', applyFilters);
 
     exportBtn.addEventListener('click', () => {
         if (filteredData.length === 0) { alert('No data to export.'); return; }
