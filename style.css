@@ -316,7 +316,7 @@ input:checked + .slider:before {
     transform: translateX(22px); /* adjusted translation */
 }
 
-/* Date Range Visual Display Styles */
+/* Date Range Visual Display Styles (Updated with timeline points) */
 .date-display-container {
     display: flex;
     align-items: center;
@@ -338,10 +338,44 @@ html.dark .date-display-container {
     font-size: 0.875rem; /* 14px */
     white-space: nowrap;
 }
+
 .date-display-line {
     flex-grow: 1;
-    border-bottom: 2px dotted #cbd5e1; /* slate-300 */
-    height: 1px;
+    position: relative;
+    border-bottom: 2px dashed #94a3b8; /* Bolder slate-400 */
+    height: 2px;
+    margin: 0 0.5rem; /* Breathing room */
+}
+
+.date-display-line::before,
+.date-display-line::after {
+    content: '';
+    position: absolute;
+    top: 100%;
+    transform: translateY(-50%);
+    width: 10px;
+    height: 10px;
+    background-color: #2563eb; /* Primary blue for timeline points */
+    border-radius: 50%;
+    box-shadow: 0 0 0 3px #f8fafc; /* Match container background for a cutout effect */
+}
+
+.date-display-line::before {
+    left: -5px;
+}
+
+.date-display-line::after {
+    right: -5px;
+}
+
+html.dark .date-display-line {
+    border-bottom-color: #64748b; /* slate-500 */
+}
+
+html.dark .date-display-line::before,
+html.dark .date-display-line::after {
+    background-color: #3b82f6; /* Lighter blue in dark mode */
+    box-shadow: 0 0 0 3px #1e293b; /* Match dark mode container bg */
 }
 
 /* Intuitive Scroll Hint */
