@@ -1763,6 +1763,12 @@ ${analysisUrl}`;
         previousWeekStart.setDate(anchorSunday.getDate() - 7);
         const previousWeekEnd = anchorSunday;
 
+        // Week Before Previous Definition (Two Sundays ago to Previous Sunday)
+        const twoWeeksAgoStart = new Date(anchorSunday);
+        twoWeeksAgoStart.setDate(anchorSunday.getDate() - 14);
+        const twoWeeksAgoEnd = new Date(anchorSunday);
+        twoWeeksAgoEnd.setDate(anchorSunday.getDate() - 7);
+
         const baseUrl = document.getElementById('api-url').value.trim() || 'https://pika-inventory-94729b833f18.herokuapp.com/api/v1/admin/analytics/retention';
         const retentionEndpoint = baseUrl.replace('/churn', '/retention');
 
@@ -1943,10 +1949,11 @@ ${analysisUrl}`;
         };
 
         try {
-            // Concurrent execution for both monitors
-            const [currentWk, prevWk] = await Promise.all([
+            // Concurrent execution for all three monitors
+            const [currentWk, prevWk, twoWksAgo] = await Promise.all([
                 getWeekData(currentWeekStart, currentWeekEnd),
-                getWeekData(previousWeekStart, previousWeekEnd)
+                getWeekData(previousWeekStart, previousWeekEnd),
+                getWeekData(twoWeeksAgoStart, twoWeeksAgoEnd)
             ]);
 
             const buildCard = (title, data, isPrimary) => {
@@ -2005,6 +2012,7 @@ ${analysisUrl}`;
                 <div class="p-6 transition-all bg-slate-50 dark:bg-slate-900/50 rounded-b-xl">
                     ${buildCard("Current Week", currentWk, true)}
                     ${buildCard("Previous Week", prevWk, false)}
+                    ${buildCard("Week Before Previous", twoWksAgo, false)}
                 </div>
             `;
             
