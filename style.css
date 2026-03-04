@@ -934,3 +934,25 @@ html.dark .onboarding-row:hover { background-color: #5b21b6 !important; }
     background-color: #ede9fe; /* violet-100 */
     color: #5b21b6; /* violet-800 */
 }
+
+/* --- High Transaction (25+) Highlight Styles --- */
+.high-tx-row {
+    outline: 2px solid #fbbf24 !important; /* amber-400 glow outline */
+    outline-offset: -2px;
+    background-color: #fef3c7 !important; /* amber-50 background */
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.5) !important;
+    position: relative;
+    z-index: 10;
+}
+html.dark .high-tx-row {
+    background-color: rgba(251, 191, 36, 0.1) !important;
+}
+
+.high-tx-card {
+    outline: 2px solid #fbbf24 !important;
+    box-shadow: 0 0 15px rgba(251, 191, 36, 0.5) !important;
+    background-color: #fef3c7 !important;
+}
+html.dark .high-tx-card {
+    background-color: rgba(251, 191, 36, 0.1) !important;
+}

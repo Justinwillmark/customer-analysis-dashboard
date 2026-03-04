@@ -277,8 +277,15 @@ document.addEventListener('DOMContentLoaded', async () => {
     };
 
     const updateReactivatedCount = (usersSubset) => {
-        if (viewMode === 'activity' || viewMode === 'onboarding') {
-            reactivatedCardTitle.textContent = viewMode === 'onboarding' ? "Total Onboarding" : "Total Active";
+        if (viewMode === 'activity') {
+            reactivatedCardTitle.textContent = "Total Active";
+            const total = usersSubset.length;
+            // Highlight ratio check
+            const highTxCount = usersSubset.filter(u => parseInt(u['Transaction Count'] || 0, 10) >= 30).length;
+            reactivatedCount.textContent = `${highTxCount}/${total}`;
+            reactivatedProgress.style.width = total > 0 ? `${(highTxCount / total) * 100}%` : '0%';
+        } else if (viewMode === 'onboarding') {
+            reactivatedCardTitle.textContent = "Total Onboarding";
             const total = usersSubset.length;
             reactivatedCount.textContent = total;
             reactivatedProgress.style.width = '100%';
@@ -324,7 +331,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                      reactivatedProgress.style.width = '0%';
                  } else {
                      reactivatedCardTitle.textContent = viewMode === 'onboarding' ? "Total Onboarding" : "Total Active";
-                     reactivatedCount.textContent = '0';
+                     reactivatedCount.textContent = viewMode === 'activity' ? '0/0' : '0';
                      reactivatedProgress.style.width = '0%';
                  }
                  
@@ -362,6 +369,9 @@ document.addEventListener('DOMContentLoaded', async () => {
         const mobileFragment = document.createDocumentFragment();
 
         usersToRender.forEach((user, index) => {
+            const txCount = parseInt(user['Transaction Count'] || 0, 10);
+            const isHighTx = viewMode === 'activity' && txCount >= 30;
+
             // 1. Desktop Row
             const tr = document.createElement('tr');
             tr.className = 'transition-colors duration-500';
@@ -381,6 +391,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else {
                 // Churned
                 statusBadge = `<span class="status-badge status-churned">Churned</span>`;
+            }
+
+            if (isHighTx) {
+                tr.classList.add('high-tx-row');
             }
 
             tr.innerHTML = `
@@ -404,6 +418,10 @@ document.addEventListener('DOMContentLoaded', async () => {
             else if (user.status === 'Reactivation-based' || user.status === 'Reactivated') cardClasses += ' border-green-200 bg-green-50';
             else if (user.status === 'Organic Active') cardClasses += ' border-blue-200 bg-blue-50';
             
+            if (isHighTx) {
+                cardClasses += ' high-tx-card';
+            }
+
             card.className = cardClasses;
             
             // Format phone number for dialing logic (234 -> 0)
