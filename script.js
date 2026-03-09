@@ -460,7 +460,7 @@ document.addEventListener('DOMContentLoaded', () => {
         createPopupTable('churned-popup', 'Churned Users', churnedData);
         createPopupTable('total-popup', 'Total Active Users', dataPeriod2);
 
-        tableTitle.textContent = `Active Users: ${period2Text}`;
+        tableTitle.textContent = `Total Users: ${period2Text}`;
         tableDescription.textContent = `Showing ${dataPeriod2.length} total users in this period.`;
 
         // Restored canvas clear checks
