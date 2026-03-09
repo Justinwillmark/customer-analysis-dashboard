@@ -237,12 +237,15 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('new-users').textContent = '-';
         document.getElementById('churned-users').textContent = '-';
         document.getElementById('total-users').textContent = '-';
-        ['retained-when', 'new-when', 'churned-when', 'total-when'].forEach(id => {
-            document.getElementById(id).textContent = '';
+        document.getElementById('active-users-count').textContent = '-';
+
+        ['retained-when', 'new-when', 'churned-when', 'total-when', 'active-when'].forEach(id => {
+            const el = document.getElementById(id);
+            if(el) el.textContent = '';
         });
 
         document.body.classList.remove('fullscreen-active');
-        ['retained-popup', 'new-popup', 'churned-popup', 'total-popup'].forEach(id => {
+        ['retained-popup', 'new-popup', 'churned-popup', 'total-popup', 'active-popup'].forEach(id => {
             const popup = document.getElementById(id);
             if (popup) {
                 popup.innerHTML = '';
@@ -439,13 +442,20 @@ document.addEventListener('DOMContentLoaded', () => {
         
         const retentionRate = usersP1PhoneNumbers.size > 0 ? (retainedUsersSet.size / usersP1PhoneNumbers.size * 100).toFixed(1) : 0;
         
-        const highFreqCount = dataPeriod2.filter(u => (u['Transaction Count'] || 0) > 10).length;
+        // Calculate dynamic threshold for Total Active Users
+        const diffTime = Math.abs(new Date(dateRange2.end) - new Date(dateRange2.start));
+        const durationDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+        const requiredTxns = Math.max(1, Math.round(30 * (durationDays / 7)));
+        
+        const activeUsersData = dataPeriod2.filter(u => (u['Transaction Count'] || 0) >= requiredTxns);
+        const highFreqCount = activeUsersData.length;
 
         document.getElementById('retention-rate').textContent = `${retentionRate}%`;
         document.getElementById('retained-users').textContent = retainedUsersSet.size;
         document.getElementById('new-users').textContent = newUsersSet.size;
         document.getElementById('churned-users').textContent = churnedData.length;
         document.getElementById('total-users').textContent = usersP2PhoneNumbers.size;
+        document.getElementById('active-users-count').textContent = highFreqCount;
 
         const period1Text = formatPeriodText(dateRange1);
         const period2Text = formatPeriodText(dateRange2);
@@ -454,11 +464,13 @@ document.addEventListener('DOMContentLoaded', () => {
         document.getElementById('new-when').textContent = `from ${period2Text}`;
         document.getElementById('churned-when').textContent = `from ${period1Text}`;
         document.getElementById('total-when').textContent = `from ${period2Text}`;
+        document.getElementById('active-when').textContent = `from ${period2Text}`;
 
         createPopupTable('retained-popup', 'Retained Users', retainedData);
         createPopupTable('new-popup', 'New Users', newData);
         createPopupTable('churned-popup', 'Churned Users', churnedData);
-        createPopupTable('total-popup', 'Total Active Users', dataPeriod2);
+        createPopupTable('total-popup', 'Total Users', dataPeriod2);
+        createPopupTable('active-popup', 'Total Active Users', activeUsersData);
 
         tableTitle.textContent = `Total Users: ${period2Text}`;
         tableDescription.textContent = `Showing ${dataPeriod2.length} total users in this period.`;
@@ -488,7 +500,8 @@ document.addEventListener('DOMContentLoaded', () => {
             newUsers: newUsersSet.size,
             churnedUsers: churnedData.length,
             totalActiveUsers: usersP2PhoneNumbers.size,
-            highFreqCount: highFreqCount, 
+            highFreqCount: highFreqCount,
+            requiredTxns: requiredTxns,
             period1Text: period1Text,
             period2Text: period2Text,
             periodLabel: period2Label,
@@ -535,17 +548,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 Date & Time Stamp of Generated Report: ${timestamp}
 
-- Retention: ${reportData.retentionRate}% of users from ${durationP1} were still active in ${durationP2}.
+- Retention: ${reportData.retentionRate}% of users from ${durationP1} also recorded sales in the ${durationP2}.
 
-- New Users: ${reportData.newUsers} retailers were newly active. These are users who were present in ${durationP2} but not in ${durationP1}.
+- New Users: ${reportData.newUsers} of them. These are either absolute new users or ones that were not present in the ${durationP1}.
 
-- Churn: ${reportData.churnedUsers} users from ${durationP1} did not return. These users were active previously but were inactive during ${durationP2}.
+- Churn: ${reportData.churnedUsers} users from ${durationP1} did not return in the ${durationP2}. 
 
-- Total Active Users: In total, there were ${reportData.totalActiveUsers} active users during ${durationP2}.
+- Total Users: In total, there were ${reportData.totalActiveUsers} users during the ${durationP2}.
 
-- Transaction Frequency: Of the ${reportData.totalActiveUsers} total active users in ${durationP2}, only ${reportData.highFreqCount} recorded sales more than 10 times in total.
+- Transaction Frequency: Of the ${reportData.totalActiveUsers} total users, only ${reportData.highFreqCount} recorded sales 30+ times.
 
-Verification Link:
+Learn more and verify report:
 ${analysisUrl}`;
 
         }
@@ -636,13 +649,16 @@ ${analysisUrl}`;
                 expandChurnPopup(container, title, data);
             });
             buttonsWrapper.appendChild(viewAllBtn);
-        } else if (popupId === 'retained-popup' || popupId === 'total-popup') {
+        } else if (popupId === 'retained-popup' || popupId === 'total-popup' || popupId === 'active-popup') {
              const viewAeBtn = document.createElement('button');
              viewAeBtn.textContent = 'AE Analysis';
              viewAeBtn.className = 'popup-action-btn';
              viewAeBtn.addEventListener('click', (e) => {
                  e.stopPropagation();
-                 const viewTitle = popupId === 'retained-popup' ? 'AE Retention View' : 'AE Performance View (Total)';
+                 let viewTitle = 'AE Performance View';
+                 if (popupId === 'retained-popup') viewTitle = 'AE Retention View';
+                 if (popupId === 'total-popup') viewTitle = 'AE Performance View (Total)';
+                 if (popupId === 'active-popup') viewTitle = 'AE Performance View (Active)';
                  expandRetentionPopup(container, viewTitle, data);
              });
              buttonsWrapper.appendChild(viewAeBtn);
@@ -760,7 +776,10 @@ ${analysisUrl}`;
                 container.classList.remove('fullscreen');
                 document.body.classList.remove('fullscreen-active');
             }
-            createPopupTable(container.id, container.id === 'retained-popup' ? 'Retained Users' : 'Total Active Users', data);
+            let origTitle = 'Total Users';
+            if (container.id === 'retained-popup') origTitle = 'Retained Users';
+            if (container.id === 'active-popup') origTitle = 'Total Active Users';
+            createPopupTable(container.id, origTitle, data);
         });
 
         const copyButton = document.createElement('button');

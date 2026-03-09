@@ -143,6 +143,22 @@ html.dark .metric-card:hover {
     background-color: #1e293b; /* slate-800 lighter */
 }
 
+.active-users-glow {
+    position: relative;
+    animation: subtle-glow 2s infinite alternate;
+}
+@keyframes subtle-glow {
+    0% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.2); }
+    100% { box-shadow: 0 0 15px rgba(59, 130, 246, 0.6); }
+}
+html.dark .active-users-glow {
+    animation: subtle-glow-dark 2s infinite alternate;
+}
+@keyframes subtle-glow-dark {
+    0% { box-shadow: 0 0 5px rgba(59, 130, 246, 0.3); }
+    100% { box-shadow: 0 0 20px rgba(59, 130, 246, 0.8); }
+}
+
 
 /* --- Details/Summary Styles for both Monitor & API blocks - MODERNIZED --- */
 .weekly-monitor-details,
