@@ -1792,7 +1792,7 @@ ${analysisUrl}`;
         const retentionEndpoint = baseUrl.replace('/churn', '/retention');
 
         const parseCSV = (csvText) => {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 Papa.parse(csvText, {
                     header: true,
                     skipEmptyLines: true,
@@ -1805,6 +1805,9 @@ ${analysisUrl}`;
                             return true;
                         });
                         resolve(validRows);
+                    },
+                    error: (error) => {
+                        reject(error);
                     }
                 });
             });
@@ -1968,12 +1971,10 @@ ${analysisUrl}`;
         };
 
         try {
-            // Concurrent execution for all three monitors
-            const [currentWk, prevWk, twoWksAgo] = await Promise.all([
-                getWeekData(currentWeekStart, currentWeekEnd),
-                getWeekData(previousWeekStart, previousWeekEnd),
-                getWeekData(twoWeeksAgoStart, twoWeeksAgoEnd)
-            ]);
+            // SEQUENTIAL execution to prevent hitting connection limits (which causes failures)
+            const currentWk = await getWeekData(currentWeekStart, currentWeekEnd);
+            const prevWk = await getWeekData(previousWeekStart, previousWeekEnd);
+            const twoWksAgo = await getWeekData(twoWeeksAgoStart, twoWeeksAgoEnd);
 
             const buildCard = (title, data, isPrimary) => {
                 const bgClass = isPrimary ? "bg-white dark:bg-slate-800" : "bg-slate-50 dark:bg-slate-800/50 opacity-90";
@@ -2049,6 +2050,12 @@ ${analysisUrl}`;
     cohortInputs.classList.add('hidden');
     churnInputs.classList.remove('hidden');
     initDatePresets();
-    setupWeeklyMonitor();
+    
+    // 1. Run main dashboard fetch first so it isn't blocked by the live monitor
     autorunFromUrl();
+    
+    // 2. Delay the Weekly Monitor to ensure it doesn't interfere with the main dashboard fetching 
+    setTimeout(() => {
+        setupWeeklyMonitor();
+    }, 2000); 
 });
