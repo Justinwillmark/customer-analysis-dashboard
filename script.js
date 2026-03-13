@@ -71,9 +71,11 @@ document.addEventListener('DOMContentLoaded', () => {
     let reportData = {};
     const accountExecutives = ['Chimezie Ezimoha', 'Waheed Ayinla', 'Abraham Ohworieha', 'Semilogo (for phone call)'];
 
-    // Added globals to store filtered lists for distribution chart toggle
+    // Added globals to store filtered lists and modes for distribution chart toggle
     window.currentDistTotalData = [];
     window.currentDistActiveData = [];
+    let currentDistIsActiveView = false;
+    let currentDistGroupingMode = 'lga'; // 'lga' or 'state'
 
     // --- DOM ELEMENTS ---
     const apiUrlInput = document.getElementById('api-url');
@@ -502,8 +504,8 @@ document.addEventListener('DOMContentLoaded', () => {
         window.currentDistTotalData = dataPeriod2;
         window.currentDistActiveData = activeUsersData;
         
-        // Render the new amazing Distribution Chart (Defaults to Total Users view)
-        renderDistributionChart(dataPeriod2, false);
+        // Render the new amazing Distribution Chart (Defaults to Total Users view, grouped by LGA)
+        renderDistributionChart(dataPeriod2, false, currentDistGroupingMode);
 
         reportData = {
             retentionRate: retentionRate,
@@ -1464,11 +1466,11 @@ ${analysisUrl}`;
     };
 
     // --- NEW: Render Interactive Modern Distribution Chart ---
-    const renderDistributionChart = (data, isActiveView) => {
+    const renderDistributionChart = (data, isActiveView, groupingMode = 'lga') => {
         if (charts.distChart) charts.distChart.destroy();
         const ctx = document.getElementById('distribution-chart').getContext('2d');
         
-        const lgaMap = {};
+        const mapData = {};
         const storeTypes = new Set();
         
         data.forEach(user => {
@@ -1477,27 +1479,29 @@ ${analysisUrl}`;
             const storeType = user['Store Type'] || 'Unknown';
             const txns = parseInt(user['Transaction Count'], 10) || 0;
             
-            const key = `${state} - ${lga}`;
-            if (!lgaMap[key]) lgaMap[key] = { users: 0, txns: 0, types: {} };
+            // Determine grouping key based on mode
+            const key = groupingMode === 'state' ? state : `${state} - ${lga}`;
             
-            lgaMap[key].users++;
-            lgaMap[key].txns += txns;
+            if (!mapData[key]) mapData[key] = { users: 0, txns: 0, types: {} };
+            
+            mapData[key].users++;
+            mapData[key].txns += txns;
             if (storeType !== 'N/A' && storeType !== 'Unknown' && storeType.trim() !== "") {
-                lgaMap[key].types[storeType] = (lgaMap[key].types[storeType] || 0) + 1;
+                mapData[key].types[storeType] = (mapData[key].types[storeType] || 0) + 1;
                 storeTypes.add(storeType);
             } else {
-                lgaMap[key].types['Uncategorized'] = (lgaMap[key].types['Uncategorized'] || 0) + 1;
+                mapData[key].types['Uncategorized'] = (mapData[key].types['Uncategorized'] || 0) + 1;
                 storeTypes.add('Uncategorized');
             }
         });
         
         // Sort by users desc, take top 20 areas to avoid overcrowding
-        const sortedLgas = Object.entries(lgaMap)
+        const sortedGroups = Object.entries(mapData)
             .sort((a, b) => b[1].users - a[1].users)
             .slice(0, 20);
             
-        const labels = sortedLgas.map(item => item[0]);
-        const txnsData = sortedLgas.map(item => item[1].txns);
+        const labels = sortedGroups.map(item => item[0]);
+        const txnsData = sortedGroups.map(item => item[1].txns);
         const storeTypesArr = Array.from(storeTypes);
         
         // Premium color palette for the stacked layers
@@ -1507,7 +1511,7 @@ ${analysisUrl}`;
             return {
                 type: 'bar',
                 label: `Store: ${type}`,
-                data: sortedLgas.map(item => item[1].types[type] || 0),
+                data: sortedGroups.map(item => item[1].types[type] || 0),
                 backgroundColor: colors[index % colors.length],
                 stack: 'Stack 0',
                 yAxisID: 'y',
@@ -1608,26 +1612,66 @@ ${analysisUrl}`;
     // --- Distribution Chart Toggle and Download Logic ---
     const toggleTotal = document.getElementById('dist-toggle-total');
     const toggleActive = document.getElementById('dist-toggle-active');
+    const toggleLga = document.getElementById('dist-toggle-lga');
+    const toggleState = document.getElementById('dist-toggle-state');
     
+    // Helper to refresh chart based on current states
+    const refreshDistributionChart = () => {
+        const dataToRender = currentDistIsActiveView ? window.currentDistActiveData : window.currentDistTotalData;
+        if (dataToRender) {
+            renderDistributionChart(dataToRender, currentDistIsActiveView, currentDistGroupingMode);
+        }
+    };
+
     if (toggleTotal && toggleActive) {
         toggleTotal.addEventListener('click', () => {
+            currentDistIsActiveView = false;
+            
             toggleTotal.classList.add('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
             toggleTotal.classList.remove('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
             
             toggleActive.classList.remove('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
             toggleActive.classList.add('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
             
-            if (window.currentDistTotalData) renderDistributionChart(window.currentDistTotalData, false);
+            refreshDistributionChart();
         });
         
         toggleActive.addEventListener('click', () => {
+            currentDistIsActiveView = true;
+            
             toggleActive.classList.add('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
             toggleActive.classList.remove('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
             
             toggleTotal.classList.remove('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
             toggleTotal.classList.add('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
             
-            if (window.currentDistActiveData) renderDistributionChart(window.currentDistActiveData, true);
+            refreshDistributionChart();
+        });
+    }
+
+    if (toggleLga && toggleState) {
+        toggleLga.addEventListener('click', () => {
+            currentDistGroupingMode = 'lga';
+            
+            toggleLga.classList.add('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
+            toggleLga.classList.remove('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
+            
+            toggleState.classList.remove('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
+            toggleState.classList.add('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
+            
+            refreshDistributionChart();
+        });
+
+        toggleState.addEventListener('click', () => {
+            currentDistGroupingMode = 'state';
+            
+            toggleState.classList.add('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
+            toggleState.classList.remove('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
+            
+            toggleLga.classList.remove('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
+            toggleLga.classList.add('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
+            
+            refreshDistributionChart();
         });
     }
 
