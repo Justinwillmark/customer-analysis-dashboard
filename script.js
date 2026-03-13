@@ -71,6 +71,10 @@ document.addEventListener('DOMContentLoaded', () => {
     let reportData = {};
     const accountExecutives = ['Chimezie Ezimoha', 'Waheed Ayinla', 'Abraham Ohworieha', 'Semilogo (for phone call)'];
 
+    // Added globals to store filtered lists for distribution chart toggle
+    window.currentDistTotalData = [];
+    window.currentDistActiveData = [];
+
     // --- DOM ELEMENTS ---
     const apiUrlInput = document.getElementById('api-url');
     const editApiUrlToggle = document.getElementById('edit-api-url-toggle');
@@ -175,7 +179,6 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     };
 
-    // RESTORED ORIGINAL: Uses UTC behavior to match original dashboard logic exactly
     const toYYYYMMDD = (d) => d.toISOString().split('T')[0];
 
     const truncateText = (text, wordLimit = 3) => {
@@ -495,6 +498,13 @@ document.addEventListener('DOMContentLoaded', () => {
             transCtx.fillText("90-day trend not available.", transCtx.canvas.width / 2, 50);
         }
         
+        // Save the filtered data globally for our new chart toggles
+        window.currentDistTotalData = dataPeriod2;
+        window.currentDistActiveData = activeUsersData;
+        
+        // Render the new amazing Distribution Chart (Defaults to Total Users view)
+        renderDistributionChart(dataPeriod2, false);
+
         reportData = {
             retentionRate: retentionRate,
             newUsers: newUsersSet.size,
@@ -1452,6 +1462,186 @@ ${analysisUrl}`;
             }
         });
     };
+
+    // --- NEW: Render Interactive Modern Distribution Chart ---
+    const renderDistributionChart = (data, isActiveView) => {
+        if (charts.distChart) charts.distChart.destroy();
+        const ctx = document.getElementById('distribution-chart').getContext('2d');
+        
+        const lgaMap = {};
+        const storeTypes = new Set();
+        
+        data.forEach(user => {
+            const state = user['State'] || 'Unknown';
+            const lga = user['LGA'] || 'Unknown';
+            const storeType = user['Store Type'] || 'Unknown';
+            const txns = parseInt(user['Transaction Count'], 10) || 0;
+            
+            const key = `${state} - ${lga}`;
+            if (!lgaMap[key]) lgaMap[key] = { users: 0, txns: 0, types: {} };
+            
+            lgaMap[key].users++;
+            lgaMap[key].txns += txns;
+            if (storeType !== 'N/A' && storeType !== 'Unknown' && storeType.trim() !== "") {
+                lgaMap[key].types[storeType] = (lgaMap[key].types[storeType] || 0) + 1;
+                storeTypes.add(storeType);
+            } else {
+                lgaMap[key].types['Uncategorized'] = (lgaMap[key].types['Uncategorized'] || 0) + 1;
+                storeTypes.add('Uncategorized');
+            }
+        });
+        
+        // Sort by users desc, take top 20 areas to avoid overcrowding
+        const sortedLgas = Object.entries(lgaMap)
+            .sort((a, b) => b[1].users - a[1].users)
+            .slice(0, 20);
+            
+        const labels = sortedLgas.map(item => item[0]);
+        const txnsData = sortedLgas.map(item => item[1].txns);
+        const storeTypesArr = Array.from(storeTypes);
+        
+        // Premium color palette for the stacked layers
+        const colors = ['#3b82f6', '#10b981', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e', '#6366f1', '#84cc16'];
+        
+        const datasets = storeTypesArr.map((type, index) => {
+            return {
+                type: 'bar',
+                label: `Store: ${type}`,
+                data: sortedLgas.map(item => item[1].types[type] || 0),
+                backgroundColor: colors[index % colors.length],
+                stack: 'Stack 0',
+                yAxisID: 'y',
+                borderRadius: 2
+            };
+        });
+        
+        // Add overlay transaction line
+        datasets.push({
+            type: 'line',
+            label: 'Total Transactions',
+            data: txnsData,
+            borderColor: '#64748b',
+            backgroundColor: '#64748b',
+            borderWidth: 2,
+            pointBackgroundColor: document.documentElement.classList.contains('dark') ? '#1e293b' : '#fff',
+            pointBorderColor: '#64748b',
+            pointBorderWidth: 2,
+            pointRadius: 4,
+            pointHoverRadius: 6,
+            tension: 0.3,
+            yAxisID: 'y1'
+        });
+        
+        const isDarkMode = document.documentElement.classList.contains('dark');
+        const textColor = isDarkMode ? '#cbd5e1' : '#475569';
+        const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+        const bgColor = isDarkMode ? '#1e293b' : '#ffffff';
+
+        // Custom plugin to render white/dark background instead of transparent for downloaded images
+        const customCanvasBackgroundColor = {
+            id: 'customCanvasBackgroundColor',
+            beforeDraw: (chart, args, options) => {
+                const {ctx} = chart;
+                ctx.save();
+                ctx.globalCompositeOperation = 'destination-over';
+                ctx.fillStyle = options.color || '#ffffff';
+                ctx.fillRect(0, 0, chart.width, chart.height);
+                ctx.restore();
+            }
+        };
+
+        charts.distChart = new Chart(ctx, {
+            data: {
+                labels: labels,
+                datasets: datasets
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                interaction: { mode: 'index', intersect: false },
+                plugins: {
+                    customCanvasBackgroundColor: { color: bgColor },
+                    legend: {
+                        position: 'top',
+                        labels: { color: textColor, usePointStyle: true, boxWidth: 8, padding: 15 }
+                    },
+                    tooltip: {
+                        backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
+                        titleColor: isDarkMode ? '#fff' : '#0f172a',
+                        bodyColor: isDarkMode ? '#cbd5e1' : '#334155',
+                        borderColor: isDarkMode ? '#334155' : '#e2e8f0',
+                        borderWidth: 1,
+                        padding: 12,
+                        boxPadding: 4,
+                        usePointStyle: true
+                    }
+                },
+                scales: {
+                    x: {
+                        stacked: true,
+                        ticks: { color: textColor, maxRotation: 45, minRotation: 45 },
+                        grid: { display: false }
+                    },
+                    y: {
+                        stacked: true,
+                        type: 'linear',
+                        display: true,
+                        position: 'left',
+                        title: { display: true, text: 'Number of Users', color: textColor, font: { weight: 'bold' } },
+                        ticks: { color: textColor },
+                        grid: { color: gridColor }
+                    },
+                    y1: {
+                        type: 'linear',
+                        display: true,
+                        position: 'right',
+                        title: { display: true, text: 'Total Transactions', color: textColor, font: { weight: 'bold' } },
+                        ticks: { color: textColor },
+                        grid: { drawOnChartArea: false }
+                    }
+                }
+            },
+            plugins: [customCanvasBackgroundColor]
+        });
+    };
+
+    // --- Distribution Chart Toggle and Download Logic ---
+    const toggleTotal = document.getElementById('dist-toggle-total');
+    const toggleActive = document.getElementById('dist-toggle-active');
+    
+    if (toggleTotal && toggleActive) {
+        toggleTotal.addEventListener('click', () => {
+            toggleTotal.classList.add('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
+            toggleTotal.classList.remove('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
+            
+            toggleActive.classList.remove('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
+            toggleActive.classList.add('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
+            
+            if (window.currentDistTotalData) renderDistributionChart(window.currentDistTotalData, false);
+        });
+        
+        toggleActive.addEventListener('click', () => {
+            toggleActive.classList.add('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
+            toggleActive.classList.remove('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
+            
+            toggleTotal.classList.remove('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
+            toggleTotal.classList.add('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
+            
+            if (window.currentDistActiveData) renderDistributionChart(window.currentDistActiveData, true);
+        });
+    }
+
+    const downloadDistBtn = document.getElementById('download-dist-chart');
+    if (downloadDistBtn) {
+        downloadDistBtn.addEventListener('click', () => {
+            if (charts.distChart) {
+                const link = document.createElement('a');
+                link.download = `User_Distribution_Chart_${new Date().toISOString().split('T')[0]}.png`;
+                link.href = charts.distChart.toBase64Image();
+                link.click();
+            }
+        });
+    }
 
     fetchApiBtn.addEventListener('click', handleApiFetch);
 

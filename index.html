@@ -373,6 +373,31 @@
                     <div id="scroll-hint-arrow"></div>
                 </div>
             </div>
+
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mb-8 mt-8">
+                <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                    <div>
+                        <h3 class="text-xl font-bold text-slate-800 dark:text-white">Demographics & Store Distribution</h3>
+                        <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">Store Types and Transactions grouped by LGA</p>
+                    </div>
+                    <div class="flex flex-col sm:flex-row items-center gap-3">
+                        <div class="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg">
+                            <button id="dist-toggle-total" class="px-4 py-1.5 text-sm font-medium rounded-md bg-white dark:bg-slate-800 shadow-sm text-blue-600 dark:text-blue-400 transition-all">Total Users</button>
+                            <button id="dist-toggle-active" class="px-4 py-1.5 text-sm font-medium rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-all">Active Only</button>
+                        </div>
+                        <button id="download-dist-chart" class="w-full sm:w-auto flex items-center justify-center gap-2 text-sm font-medium text-slate-600 dark:text-slate-300 hover:text-blue-600 dark:hover:text-blue-400 transition-colors bg-slate-50 dark:bg-slate-700/50 px-3 py-1.5 rounded-md border border-slate-200 dark:border-slate-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                            Save Image
+                        </button>
+                    </div>
+                </div>
+                <div class="h-[500px] relative w-full">
+                    <canvas id="distribution-chart"></canvas>
+                </div>
+            </div>
+
         </div>
     </div>
 
