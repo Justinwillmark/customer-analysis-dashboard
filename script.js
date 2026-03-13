@@ -544,19 +544,18 @@ document.addEventListener('DOMContentLoaded', () => {
             const analysisUrl = `${window.location.href.split('?')[0]}?autorun=true&isCohort=${reportData.apiParams.isCohort}&start1=${reportData.apiParams.start1}&end1=${reportData.apiParams.end1}&start2=${reportData.apiParams.start2}&end2=${reportData.apiParams.end2}`;
 
             summaryText = `Report Summary for ${durationP2} (${p2DateRange})
-(Auto-generated with Pika-RS)
 
-Date & Time Stamp of Generated Report: ${timestamp}
+Generated with Pika-RS: ${timestamp}
 
 - Retention: ${reportData.retentionRate}% of users from ${durationP1} also recorded sales in the ${durationP2}.
 
-- New Users: ${reportData.newUsers} of them. These are either absolute new users or ones that were not present in the ${durationP1}.
+- New Users: ${reportData.newUsers} in total, either newly onboarded or returning after being inactive in ${durationP1}.
 
 - Churn: ${reportData.churnedUsers} users from ${durationP1} did not return in the ${durationP2}. 
 
-- Total Users: In total, there were ${reportData.totalActiveUsers} users during the ${durationP2}.
+- Total Users: In total, ${reportData.totalActiveUsers} users recorded sales during the ${durationP2}.
 
-- Transaction Frequency: Of the ${reportData.totalActiveUsers} total users, only ${reportData.highFreqCount} recorded sales 30+ times.
+- TXN Freq.: Of the ${reportData.totalActiveUsers} total users, only ${reportData.highFreqCount} recorded sales 30+ times.
 
 Learn more and verify report:
 ${analysisUrl}`;
