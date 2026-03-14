@@ -1545,6 +1545,7 @@ ${analysisUrl}`;
 
         // Format dynamic title string
         const viewLabel = isActiveView ? 'Active Users Only' : 'Total Users';
+        const totalUsersCount = data.length.toLocaleString();
 
         // Custom plugin to render white/dark background instead of transparent for downloaded images
         const customCanvasBackgroundColor = {
@@ -1576,7 +1577,7 @@ ${analysisUrl}`;
                     },
                     title: {
                         display: true,
-                        text: `${viewLabel}: ${periodText || 'N/A'}`,
+                        text: `${viewLabel} (${totalUsersCount}): ${periodText || 'N/A'}`,
                         position: 'bottom',
                         color: textColor,
                         font: { size: 16, style: 'normal', weight: 'bold' },
@@ -1693,7 +1694,7 @@ ${analysisUrl}`;
         downloadDistBtn.addEventListener('click', () => {
             if (charts.distChart) {
                 const link = document.createElement('a');
-                link.download = `User_Distribution_Chart_${new Date().toISOString().split('T')[0]}.png`;
+                link.download = `Pika_User_Distribution_Chart_${new Date().toISOString().split('T')[0]}.png`;
                 link.href = charts.distChart.toBase64Image();
                 link.click();
             }
