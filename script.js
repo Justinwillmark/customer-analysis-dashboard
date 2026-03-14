@@ -2034,7 +2034,8 @@ ${analysisUrl}`;
         const twoWeeksAgoEnd = new Date(anchorSunday);
         twoWeeksAgoEnd.setDate(anchorSunday.getDate() - 7);
 
-        const baseUrl = document.getElementById('api-url').value.trim() || 'https://pika-inventory-94729b833f18.herokuapp.com/api/v1/admin/analytics/retention';
+        // EXACT STRING FIX APPLIED HERE
+        const baseUrl = document.getElementById('api-url').value.trim() || 'https://store-api.pikainsights.com/api/v1/admin/analytics/retention';
         const retentionEndpoint = baseUrl.replace('/churn', '/retention');
 
         const parseCSV = (csvText) => {
