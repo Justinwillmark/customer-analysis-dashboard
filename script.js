@@ -1579,7 +1579,7 @@ ${analysisUrl}`;
                         text: `${viewLabel}: ${periodText || 'N/A'}`,
                         position: 'bottom',
                         color: textColor,
-                        font: { size: 13, style: 'italic', weight: '500' },
+                        font: { size: 16, style: 'normal', weight: 'bold' },
                         padding: { top: 20, bottom: 5 }
                     },
                     tooltip: {
