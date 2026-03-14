@@ -76,6 +76,7 @@ document.addEventListener('DOMContentLoaded', () => {
     window.currentDistActiveData = [];
     let currentDistIsActiveView = false;
     let currentDistGroupingMode = 'lga'; // 'lga' or 'state'
+    window.currentDistPeriodText = ''; // Stores the current period string for the chart bottom
 
     // --- DOM ELEMENTS ---
     const apiUrlInput = document.getElementById('api-url');
@@ -500,12 +501,13 @@ document.addEventListener('DOMContentLoaded', () => {
             transCtx.fillText("90-day trend not available.", transCtx.canvas.width / 2, 50);
         }
         
-        // Save the filtered data globally for our new chart toggles
+        // Save the filtered data and period text globally for our new chart toggles
         window.currentDistTotalData = dataPeriod2;
         window.currentDistActiveData = activeUsersData;
+        window.currentDistPeriodText = period2Text; // Captured for chart bottom title
         
         // Render the new amazing Distribution Chart (Defaults to Total Users view, grouped by LGA)
-        renderDistributionChart(dataPeriod2, false, currentDistGroupingMode);
+        renderDistributionChart(dataPeriod2, false, currentDistGroupingMode, period2Text);
 
         reportData = {
             retentionRate: retentionRate,
@@ -1466,7 +1468,7 @@ ${analysisUrl}`;
     };
 
     // --- NEW: Render Interactive Modern Distribution Chart ---
-    const renderDistributionChart = (data, isActiveView, groupingMode = 'lga') => {
+    const renderDistributionChart = (data, isActiveView, groupingMode = 'lga', periodText = '') => {
         if (charts.distChart) charts.distChart.destroy();
         const ctx = document.getElementById('distribution-chart').getContext('2d');
         
@@ -1541,6 +1543,9 @@ ${analysisUrl}`;
         const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
         const bgColor = isDarkMode ? '#1e293b' : '#ffffff';
 
+        // Format dynamic title string
+        const viewLabel = isActiveView ? 'Active Users Only' : 'Total Users';
+
         // Custom plugin to render white/dark background instead of transparent for downloaded images
         const customCanvasBackgroundColor = {
             id: 'customCanvasBackgroundColor',
@@ -1568,6 +1573,14 @@ ${analysisUrl}`;
                     legend: {
                         position: 'top',
                         labels: { color: textColor, usePointStyle: true, boxWidth: 8, padding: 15 }
+                    },
+                    title: {
+                        display: true,
+                        text: `${viewLabel}: ${periodText || 'N/A'}`,
+                        position: 'bottom',
+                        color: textColor,
+                        font: { size: 13, style: 'italic', weight: '500' },
+                        padding: { top: 20, bottom: 5 }
                     },
                     tooltip: {
                         backgroundColor: isDarkMode ? 'rgba(15, 23, 42, 0.9)' : 'rgba(255, 255, 255, 0.9)',
@@ -1619,7 +1632,7 @@ ${analysisUrl}`;
     const refreshDistributionChart = () => {
         const dataToRender = currentDistIsActiveView ? window.currentDistActiveData : window.currentDistTotalData;
         if (dataToRender) {
-            renderDistributionChart(dataToRender, currentDistIsActiveView, currentDistGroupingMode);
+            renderDistributionChart(dataToRender, currentDistIsActiveView, currentDistGroupingMode, window.currentDistPeriodText);
         }
     };
 
