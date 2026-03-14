@@ -231,7 +231,27 @@
                 </div>
             </div>
 
-            <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+            <details class="lookback-details bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-8 shadow-sm">
+                <summary class="dark:text-slate-200 dark:hover:bg-slate-700">MoM Metrics: Look back 90-days</summary>
+                <div class="p-6 border-t border-slate-100 dark:border-slate-700">
+                    <div class="grid grid-cols-1 gap-8">
+                        <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                            <h3 class="font-semibold mb-4 text-center text-slate-700 dark:text-slate-200">User Overview & Retention (90-Day Trend)</h3>
+                            <div class="h-96">
+                                <canvas id="user-chart"></canvas>
+                            </div>
+                        </div>
+                        <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                            <h3 class="font-semibold mb-4 text-center text-slate-700 dark:text-slate-200">Transaction Comparison (90-Day Trend)</h3>
+                             <div class="h-96">
+                                <canvas id="transaction-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
+            <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mb-8">
                 <div class="mb-6">
                     <div class="mb-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                         <div>
@@ -382,21 +402,6 @@
                          </p>
                     </div>
                     <div id="scroll-hint-arrow"></div>
-                </div>
-            </div>
-
-            <div class="grid grid-cols-1 gap-8 mb-8 mt-8">
-                <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
-                    <h3 class="font-semibold mb-4 text-center text-slate-700 dark:text-slate-200">User Overview & Retention (90-Day Trend)</h3>
-                    <div class="h-96">
-                        <canvas id="user-chart"></canvas>
-                    </div>
-                </div>
-                <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
-                    <h3 class="font-semibold mb-4 text-center text-slate-700 dark:text-slate-200">Transaction Comparison (90-Day Trend)</h3>
-                     <div class="h-96">
-                        <canvas id="transaction-chart"></canvas>
-                    </div>
                 </div>
             </div>
 

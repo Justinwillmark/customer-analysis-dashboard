@@ -162,18 +162,21 @@ html.dark .active-users-glow {
 
 /* --- Details/Summary Styles for both Monitor & API blocks - MODERNIZED --- */
 .weekly-monitor-details,
-.api-details {
+.api-details,
+.lookback-details {
     overflow: hidden; /* Ensure rounded corners clip content */
     box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06); /* Stronger default shadow */
     transition: box-shadow 0.3s ease;
 }
 .weekly-monitor-details:hover,
-.api-details:hover {
+.api-details:hover,
+.lookback-details:hover {
     box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* Lift effect */
 }
 
 .weekly-monitor-details > summary,
-.api-details > summary {
+.api-details > summary,
+.lookback-details > summary {
     list-style: none; /* Remove default marker */
     padding: 1rem 1.5rem;
     font-weight: 600;
@@ -182,15 +185,18 @@ html.dark .active-users-glow {
     transition: background-color 0.2s;
 }
 html.dark .weekly-monitor-details > summary,
-html.dark .api-details > summary { color: #e2e8f0; }
+html.dark .api-details > summary,
+html.dark .lookback-details > summary { color: #e2e8f0; }
 
 .weekly-monitor-details > summary::-webkit-details-marker,
-.api-details > summary::-webkit-details-marker {
+.api-details > summary::-webkit-details-marker,
+.lookback-details > summary::-webkit-details-marker {
     display: none; /* Hide for Chrome/Safari */
 }
 
 .weekly-monitor-details > summary::before,
-.api-details > summary::before {
+.api-details > summary::before,
+.lookback-details > summary::before {
     content: '▶'; /* Collapsed state */
     display: inline-block;
     margin-right: 0.75rem;
@@ -200,17 +206,20 @@ html.dark .api-details > summary { color: #e2e8f0; }
 }
 
 .weekly-monitor-details[open] > summary::before,
-.api-details[open] > summary::before {
+.api-details[open] > summary::before,
+.lookback-details[open] > summary::before {
     transform: rotate(90deg); /* Expanded state */
 }
 
 .weekly-monitor-details[open] > summary,
-.api-details[open] > summary {
+.api-details[open] > summary,
+.lookback-details[open] > summary {
     background-color: #f8fafc; /* slate-50 - subtle background */
     border-bottom: 1px solid #e2e8f0;
 }
 html.dark .weekly-monitor-details[open] > summary,
-html.dark .api-details[open] > summary { 
+html.dark .api-details[open] > summary,
+html.dark .lookback-details[open] > summary { 
     background-color: #1e293b; 
     border-bottom: 1px solid #334155;
 }
