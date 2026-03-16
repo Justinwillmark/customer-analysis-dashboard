@@ -561,17 +561,17 @@ document.addEventListener('DOMContentLoaded', () => {
 
 Generated with Pika-RS: ${timestamp}
 
-- Retention: ${reportData.retentionRate}% of users from ${durationP1} also recorded sales in the ${durationP2}.
+- RETENTION: ${reportData.retentionRate}% of users from ${durationP1} also recorded sales in the ${durationP2}.
 
-- New Users: ${reportData.newUsers} in total, either newly onboarded or returning after being inactive in ${durationP1}.
+- NEW USERS: ${reportData.newUsers} in total, either newly onboarded or returning after being inactive in ${durationP1}.
 
-- Churn: ${reportData.churnedUsers} users from ${durationP1} did not return in the ${durationP2}. 
+- CHURN: ${reportData.churnedUsers} users from ${durationP1} did not return in the ${durationP2}. 
 
-- Total Users: In total, ${reportData.totalActiveUsers} users recorded sales during the ${durationP2}.
+- TOTAL USERS: In total, ${reportData.totalActiveUsers} users recorded sales during the ${durationP2}.
 
-- TXN Freq.: Of the ${reportData.totalActiveUsers} total users, only ${reportData.highFreqCount} recorded sales 30+ times.
+- ACTIVE USERS by TXN FREQ.: Of the ${reportData.totalActiveUsers} total users, only ${reportData.highFreqCount} recorded sales 30+ times.
 
-Learn more and verify report:
+Learn more and view distribution:
 ${analysisUrl}`;
 
         }
