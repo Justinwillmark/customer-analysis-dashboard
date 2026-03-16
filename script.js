@@ -563,7 +563,7 @@ Generated with Pika-RS: ${timestamp}
 
 - RETENTION: ${reportData.retentionRate}% of users from ${durationP1} also recorded sales in the ${durationP2}.
 
-- NEW USERS: ${reportData.newUsers} in total, either newly onboarded or returning after being inactive in ${durationP1}.
+- NEW USERS: ${reportData.newUsers} in total, either newly onboarded or returned after being inactive in ${durationP1}.
 
 - CHURN: ${reportData.churnedUsers} users from ${durationP1} did not return in the ${durationP2}. 
 
@@ -2267,7 +2267,7 @@ ${analysisUrl}`;
                                     <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 </div>
                                 <div>
-                                    <p class="text-xs font-medium text-blue-600 dark:text-blue-400">Organic Active</p>
+                                    <p class="text-xs font-medium text-blue-600 dark:text-blue-400">Organic Users</p>
                                     <p class="text-xl font-bold text-slate-800 dark:text-white">${data.organic}</p>
                                 </div>
                             </div>

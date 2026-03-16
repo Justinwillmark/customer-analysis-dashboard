@@ -385,9 +385,9 @@ document.addEventListener('DOMContentLoaded', async () => {
             } else if (user.status === 'Reactivation-based' || user.status === 'Reactivated') {
                 tr.classList.add('reactivated-row');
                 statusBadge = `<span class="status-badge status-reactivated">${user.status === 'Reactivated' ? 'Reactivated' : 'Reactivation-based'}</span>`;
-            } else if (user.status === 'Organic Active') {
+            } else if (user.status === 'Organic') {
                 tr.classList.add('onboarded-row'); 
-                statusBadge = `<span class="status-badge status-onboarded">Organic Active</span>`;
+                statusBadge = `<span class="status-badge status-onboarded">Organic</span>`;
             } else {
                 // Churned
                 statusBadge = `<span class="status-badge status-churned">Churned</span>`;
@@ -416,7 +416,7 @@ document.addEventListener('DOMContentLoaded', async () => {
             
             if (user.status === 'Onboarding') cardClasses += ' border-purple-200 bg-purple-50';
             else if (user.status === 'Reactivation-based' || user.status === 'Reactivated') cardClasses += ' border-green-200 bg-green-50';
-            else if (user.status === 'Organic Active') cardClasses += ' border-blue-200 bg-blue-50';
+            else if (user.status === 'Organic') cardClasses += ' border-blue-200 bg-blue-50';
             
             if (isHighTx) {
                 cardClasses += ' high-tx-card';
@@ -548,7 +548,7 @@ document.addEventListener('DOMContentLoaded', async () => {
                 return {
                     ...user,
                     assignedAE: user['Referral Code'],
-                    status: isMonitored ? 'Reactivation-based' : 'Organic Active'
+                    status: isMonitored ? 'Reactivation-based' : 'Organic'
                 };
             });
         }
