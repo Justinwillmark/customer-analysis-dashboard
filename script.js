@@ -67,6 +67,12 @@ document.addEventListener('DOMContentLoaded', () => {
     let dateRange2 = null;
     let period2Label = null;
     let charts = {};
+    let ndlCompareChartInst = null;
+    let ndlTopChartInst = null;
+    let ndlDistChartInst = null;
+    let ndlDistributionData = null;
+    let ndlStoreTypes = [];
+    let currentNdlDistMode = 'lga';
     let scrollHintCounter = 0;
     let reportData = {};
     const accountExecutives = ['Chimezie Ezimoha', 'Waheed Ayinla', 'Abraham Ohworieha', 'Semilogo (for phone call)'];
@@ -250,6 +256,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if(el) el.textContent = '';
         });
 
+        const ndlDetails = document.querySelector('.ndl-view-details');
+        if (ndlDetails) ndlDetails.classList.add('hidden');
+
         document.body.classList.remove('fullscreen-active');
         ['retained-popup', 'new-popup', 'churned-popup', 'total-popup', 'active-popup'].forEach(id => {
             const popup = document.getElementById(id);
@@ -400,6 +409,12 @@ document.addEventListener('DOMContentLoaded', () => {
             const apiDetails = document.querySelector('.api-details');
             if (apiDetails) apiDetails.open = false;
 
+            if (dateRange2 && dateRange2.start && dateRange2.end) {
+                const ndlDetails = document.querySelector('.ndl-view-details');
+                if (ndlDetails) ndlDetails.classList.remove('hidden');
+                fetchAndRenderNdlView(dateRange2.start, dateRange2.end);
+            }
+
             dashboard.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
         } catch (error) {
@@ -480,6 +495,9 @@ document.addEventListener('DOMContentLoaded', () => {
 
         tableTitle.textContent = `Total Users: ${period2Text}`;
         tableDescription.textContent = `Showing ${dataPeriod2.length} total users in this period.`;
+        
+        const ndlViewTitle = document.getElementById('ndl-view-title');
+        if (ndlViewTitle) ndlViewTitle.textContent = `NDL View: ${period2Text}`;
 
         // Restored canvas clear checks
         if (dateRange2 && dateRange2.end && dateRange2.end !== 'Data') {
@@ -1155,7 +1173,251 @@ ${analysisUrl}`;
         dataTable.appendChild(fragment);
     };
 
-    const destroyCharts = () => { Object.values(charts).forEach(chart => { if (chart) chart.destroy(); }); charts = {}; };
+    const destroyCharts = () => { 
+        Object.values(charts).forEach(chart => { if (chart) chart.destroy(); }); 
+        charts = {}; 
+        if (ndlCompareChartInst) { ndlCompareChartInst.destroy(); ndlCompareChartInst = null; }
+        if (ndlTopChartInst) { ndlTopChartInst.destroy(); ndlTopChartInst = null; }
+        if (ndlDistChartInst) { ndlDistChartInst.destroy(); ndlDistChartInst = null; }
+    };
+
+    const fetchAndRenderNdlView = async (startDate, endDate) => {
+        const statusContainer = document.getElementById('ndl-status-container');
+        const contentContainer = document.getElementById('ndl-content');
+        if (!statusContainer || !contentContainer) return;
+        
+        statusContainer.classList.remove('hidden');
+        contentContainer.classList.add('hidden');
+        
+        try {
+            const url = `https://pika-inventory-94729b833f18.herokuapp.com/api/v1/admin/analytics/adhocReport?edownload=excel&startDate=${startDate}&endDate=${endDate}`;
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("NDL API failed");
+            const json = await res.json();
+            
+            const users = json.data?.product_information || [];
+            
+            let ndlRetailers = 0;
+            let ndlQty = 0;
+            let ndlSales = 0;
+            let otherQty = 0;
+            let otherSales = 0;
+            
+            const ndlProductCounts = {};
+            const storeTypesSet = new Set();
+            let ndlLocData = { lga: {}, state: {} };
+
+            users.forEach(user => {
+                let userNdlVolume = 0;
+                let hasNdl = false;
+                const carts = user.carts || [];
+                carts.forEach(cart => {
+                    (cart.ndl_products || []).forEach(p => {
+                        hasNdl = true;
+                        const qty = p.quantity || 0;
+                        userNdlVolume += qty;
+                        ndlQty += qty;
+                        ndlSales += (p.price || 0) * qty;
+                        
+                        if (!ndlProductCounts[p.name]) ndlProductCounts[p.name] = { qty: 0, sales: 0 };
+                        ndlProductCounts[p.name].qty += qty;
+                        ndlProductCounts[p.name].sales += (p.price || 0) * qty;
+                    });
+                    
+                    (cart.other_products || []).forEach(p => {
+                        otherQty += p.quantity || 0;
+                        otherSales += (p.price || 0) * (p.quantity || 0);
+                    });
+                });
+                
+                if (hasNdl) {
+                    ndlRetailers++;
+                    const lga = user.city || user.lga || 'Unknown';
+                    const state = user.state || 'Unknown';
+                    const sType = user.store_type || user.storeType || 'Unknown';
+                    
+                    storeTypesSet.add(sType);
+                    
+                    if (!ndlLocData.lga[lga]) ndlLocData.lga[lga] = {};
+                    if (!ndlLocData.lga[lga][sType]) ndlLocData.lga[lga][sType] = 0;
+                    ndlLocData.lga[lga][sType] += userNdlVolume;
+
+                    if (!ndlLocData.state[state]) ndlLocData.state[state] = {};
+                    if (!ndlLocData.state[state][sType]) ndlLocData.state[state][sType] = 0;
+                    ndlLocData.state[state][sType] += userNdlVolume;
+                }
+            });
+            
+            document.getElementById('ndl-retailers-count').textContent = ndlRetailers.toLocaleString();
+            document.getElementById('ndl-qty').textContent = ndlQty.toLocaleString();
+            document.getElementById('ndl-sales').textContent = new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(ndlSales);
+            document.getElementById('other-qty').textContent = otherQty.toLocaleString();
+            document.getElementById('other-sales').textContent = new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(otherSales);
+            
+            renderNdlCharts(ndlQty, ndlSales, otherQty, otherSales, ndlProductCounts);
+            
+            ndlDistributionData = ndlLocData;
+            ndlStoreTypes = Array.from(storeTypesSet);
+            currentNdlDistMode = 'lga';
+            renderNdlDistributionChart(currentNdlDistMode);
+            
+            statusContainer.classList.add('hidden');
+            contentContainer.classList.remove('hidden');
+        } catch (err) {
+            console.error("Error fetching NDL data:", err);
+            statusContainer.innerHTML = `<p class="text-red-500 text-sm font-medium">Failed to load NDL data: ${err.message}</p>`;
+        }
+    };
+
+    const renderNdlCharts = (ndlQty, ndlSales, otherQty, otherSales, ndlProducts) => {
+        if (ndlCompareChartInst) ndlCompareChartInst.destroy();
+        if (ndlTopChartInst) ndlTopChartInst.destroy();
+        
+        const isDarkMode = document.documentElement.classList.contains('dark');
+        const textColor = isDarkMode ? '#cbd5e1' : '#475569';
+        const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+
+        // 1. Comparison Chart (NDL vs Others)
+        const compareCtx = document.getElementById('ndl-compare-chart').getContext('2d');
+        ndlCompareChartInst = new Chart(compareCtx, {
+            type: 'bar',
+            data: {
+                labels: ['NDL', 'Competition'],
+                datasets: [
+                    {
+                        label: 'Volume (Qty)',
+                        data: [ndlQty, otherQty],
+                        backgroundColor: '#3b82f6',
+                        yAxisID: 'y',
+                        borderRadius: 4
+                    },
+                    {
+                        label: 'Sales (₦)',
+                        data: [ndlSales, otherSales],
+                        backgroundColor: '#10b981',
+                        yAxisID: 'y1',
+                        borderRadius: 4
+                    }
+                ]
+            },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { color: textColor, usePointStyle: true } },
+                    tooltip: {
+                        mode: 'index',
+                        intersect: false,
+                        callbacks: {
+                            label: function(context) {
+                                let label = context.dataset.label || '';
+                                if (label) { label += ': '; }
+                                if (context.dataset.yAxisID === 'y1') {
+                                    label += new Intl.NumberFormat('en-NG', { style: 'currency', currency: 'NGN', maximumFractionDigits: 0 }).format(context.parsed.y);
+                                } else {
+                                    label += context.parsed.y.toLocaleString();
+                                }
+                                return label;
+                            }
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: textColor, font: { weight: 'bold' } }, grid: { display: false } },
+                    y: { 
+                        type: 'linear', position: 'left', title: { display: true, text: 'Volume', color: textColor },
+                        ticks: { color: textColor }, grid: { color: gridColor }, suggestedMax: Math.max(ndlQty, otherQty) * 1.2
+                    },
+                    y1: {
+                        type: 'linear', position: 'right', title: { display: true, text: 'Sales (₦)', color: textColor },
+                        ticks: { color: textColor, callback: function(value) { if (value >= 1000000) return (value / 1000000) + 'M'; if (value >= 1000) return (value / 1000) + 'K'; return value; } },
+                        grid: { drawOnChartArea: false }, suggestedMax: Math.max(ndlSales, otherSales) * 1.2
+                    }
+                }
+            }
+        });
+
+        // 2. Top NDL Products Chart
+        const topCtx = document.getElementById('ndl-top-chart').getContext('2d');
+        const topProducts = Object.entries(ndlProducts).sort((a, b) => b[1].qty - a[1].qty).slice(0, 5);
+        
+        ndlTopChartInst = new Chart(topCtx, {
+            type: 'bar',
+            data: {
+                labels: topProducts.map(p => p[0].length > 25 ? p[0].substring(0, 25) + '...' : p[0]),
+                datasets: [{
+                    label: 'Volume Sold',
+                    data: topProducts.map(p => p[1].qty),
+                    backgroundColor: ['#6366f1', '#8b5cf6', '#ec4899', '#f43f5e', '#f59e0b'],
+                    borderRadius: 4
+                }]
+            },
+            options: {
+                indexAxis: 'y',
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false },
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) { return 'Volume: ' + context.parsed.x.toLocaleString() + ' qty'; }
+                        }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: textColor }, grid: { color: gridColor }, title: { display: true, text: 'Volume (Qty)', color: textColor } },
+                    y: { ticks: { color: textColor, font: {size: 11} }, grid: { display: false } }
+                }
+            }
+        });
+    };
+
+    const renderNdlDistributionChart = (mode) => {
+        if (!ndlDistributionData) return;
+        if (ndlDistChartInst) ndlDistChartInst.destroy();
+        
+        const dataObj = ndlDistributionData[mode];
+        
+        const locTotals = Object.keys(dataObj).map(loc => {
+            const types = dataObj[loc];
+            const total = Object.values(types).reduce((sum, val) => sum + val, 0);
+            return { loc, total };
+        }).sort((a, b) => b.total - a.total).slice(0, 20); // Top 20 locations
+        
+        const labels = locTotals.map(item => item.loc);
+        const colorPalette = ['#3b82f6', '#10b981', '#f59e0b', '#6366f1', '#ec4899', '#8b5cf6', '#14b8a6', '#f43f5e', '#84cc16', '#06b6d4'];
+        
+        const datasets = ndlStoreTypes.map((sType, idx) => {
+            return {
+                label: sType,
+                data: labels.map(loc => dataObj[loc][sType] || 0),
+                backgroundColor: colorPalette[idx % colorPalette.length],
+                stack: 'Stack 0',
+                borderRadius: 2
+            };
+        });
+
+        const filteredDatasets = datasets.filter(ds => ds.data.some(val => val > 0));
+
+        const ctx = document.getElementById('ndl-dist-chart').getContext('2d');
+        const isDarkMode = document.documentElement.classList.contains('dark');
+        const textColor = isDarkMode ? '#cbd5e1' : '#475569';
+        const gridColor = isDarkMode ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+
+        ndlDistChartInst = new Chart(ctx, {
+            type: 'bar',
+            data: { labels, datasets: filteredDatasets },
+            options: {
+                responsive: true, maintainAspectRatio: false,
+                plugins: {
+                    legend: { position: 'top', labels: { color: textColor, usePointStyle: true } },
+                    tooltip: { mode: 'index', intersect: false }
+                },
+                scales: {
+                    x: { stacked: true, ticks: { color: textColor, maxRotation: 45, minRotation: 45 }, grid: { display: false } },
+                    y: { stacked: true, ticks: { color: textColor }, grid: { color: gridColor }, title: { display: true, text: 'NDL Volume', color: textColor } }
+                }
+            }
+        });
+    };
 
     const fetchAndRender90DayCharts = async (endDateStr) => {
         const baseUrl = apiUrlInput.value.trim();
@@ -1686,6 +1948,29 @@ ${analysisUrl}`;
             toggleLga.classList.add('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700');
             
             refreshDistributionChart();
+        });
+    }
+
+    const ndlToggleLga = document.getElementById('ndl-dist-toggle-lga');
+    const ndlToggleState = document.getElementById('ndl-dist-toggle-state');
+    
+    if (ndlToggleLga && ndlToggleState) {
+        ndlToggleLga.addEventListener('click', () => {
+            currentNdlDistMode = 'lga';
+            ndlToggleLga.classList.add('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
+            ndlToggleLga.classList.remove('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700', 'dark:hover:text-slate-200');
+            ndlToggleState.classList.remove('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
+            ndlToggleState.classList.add('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700', 'dark:hover:text-slate-200');
+            renderNdlDistributionChart(currentNdlDistMode);
+        });
+
+        ndlToggleState.addEventListener('click', () => {
+            currentNdlDistMode = 'state';
+            ndlToggleState.classList.add('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
+            ndlToggleState.classList.remove('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700', 'dark:hover:text-slate-200');
+            ndlToggleLga.classList.remove('bg-white', 'dark:bg-slate-800', 'shadow-sm', 'text-blue-600', 'dark:text-blue-400');
+            ndlToggleLga.classList.add('text-slate-500', 'dark:text-slate-400', 'hover:text-slate-700', 'dark:hover:text-slate-200');
+            renderNdlDistributionChart(currentNdlDistMode);
         });
     }
 

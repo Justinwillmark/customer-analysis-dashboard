@@ -405,6 +405,78 @@
                 </div>
             </div>
 
+            <details class="ndl-view-details bg-white dark:bg-slate-800 rounded-xl border border-slate-200 dark:border-slate-700 mb-8 shadow-sm">
+                <summary class="px-6 py-5 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors flex justify-between items-center select-none rounded-xl">
+                    <h3 id="ndl-view-title" class="text-xl font-bold text-slate-800 dark:text-white">NDL View</h3>
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                </summary>
+                <div class="p-6 border-t border-slate-100 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-800/30 rounded-b-xl">
+                    <div id="ndl-status-container" class="text-center py-8 hidden">
+                        <div class="loader mx-auto mb-4 w-8 h-8 border-4"></div>
+                        <p class="font-medium text-slate-500 animate-pulse">Fetching NDL data...</p>
+                    </div>
+                    <div id="ndl-content" class="hidden">
+                        <div class="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">
+                            <div class="metric-card bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                                <h3 class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-700/50 p-1.5 rounded text-center mb-2">NDL Retailers</h3>
+                                <p id="ndl-retailers-count" class="text-3xl font-extrabold text-center text-slate-800 dark:text-white">-</p>
+                            </div>
+                            <div class="metric-card bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 ring-1 ring-blue-500/20">
+                                <h3 class="text-[11px] font-bold text-blue-600 dark:text-blue-400 uppercase tracking-widest bg-blue-50 dark:bg-blue-900/20 p-1.5 rounded text-center mb-2">NDL Products (Qty)</h3>
+                                <p id="ndl-qty" class="text-3xl font-extrabold text-center text-blue-600 dark:text-blue-400">-</p>
+                            </div>
+                            <div class="metric-card bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 ring-1 ring-emerald-500/20">
+                                <h3 class="text-[11px] font-bold text-emerald-600 dark:text-emerald-400 uppercase tracking-widest bg-emerald-50 dark:bg-emerald-900/20 p-1.5 rounded text-center mb-2">NDL Sales Value</h3>
+                                <p id="ndl-sales" class="text-2xl sm:text-3xl font-extrabold text-center text-emerald-600 dark:text-emerald-400">-</p>
+                            </div>
+                            <div class="metric-card bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                                <h3 class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-700/50 p-1.5 rounded text-center mb-2">Other Products (Qty)</h3>
+                                <p id="other-qty" class="text-3xl font-extrabold text-center text-slate-700 dark:text-slate-300">-</p>
+                            </div>
+                            <div class="metric-card bg-white dark:bg-slate-800 p-4 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                                <h3 class="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest bg-slate-100 dark:bg-slate-700/50 p-1.5 rounded text-center mb-2">Other Sales Value</h3>
+                                <p id="other-sales" class="text-2xl sm:text-3xl font-extrabold text-center text-slate-700 dark:text-slate-300">-</p>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 bg-transparent mb-8">
+                            <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                                <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-1">NDL vs Competition</h3>
+                                <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">Volume & Sales Comparison</p>
+                                <div class="h-80 relative w-full">
+                                    <canvas id="ndl-compare-chart"></canvas>
+                                </div>
+                            </div>
+                            <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700">
+                                <h3 class="text-lg font-bold text-slate-800 dark:text-white mb-1">Top NDL Products</h3>
+                                <p class="text-sm text-slate-500 dark:text-slate-400 mb-6">By Volume (Qty)</p>
+                                <div class="h-80 relative w-full">
+                                    <canvas id="ndl-top-chart"></canvas>
+                                </div>
+                            </div>
+                        </div>
+                        
+                        <div class="bg-white dark:bg-slate-800 p-6 rounded-xl shadow-sm border border-slate-100 dark:border-slate-700 mb-8">
+                            <div class="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+                                <div>
+                                    <h3 class="text-xl font-bold text-slate-800 dark:text-white">NDL Regional Performance</h3>
+                                    <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">NDL Volume distribution by Location and Store Types</p>
+                                </div>
+                                <div class="flex bg-slate-100 dark:bg-slate-700 p-1 rounded-lg flex-shrink-0">
+                                    <button id="ndl-dist-toggle-lga" class="px-4 py-1.5 text-sm font-medium rounded-md bg-white dark:bg-slate-800 shadow-sm text-blue-600 dark:text-blue-400 transition-all">By LGA</button>
+                                    <button id="ndl-dist-toggle-state" class="px-4 py-1.5 text-sm font-medium rounded-md text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 transition-all">By State</button>
+                                </div>
+                            </div>
+                            <div class="h-[400px] relative w-full">
+                                <canvas id="ndl-dist-chart"></canvas>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </details>
+
         </div>
     </div>
 
